@@ -17,7 +17,6 @@ import t from 'src/l10n/helpers';
 import LocalDictionaryBuilder from 'src/localDictionaryBuilder';
 import LanguageChooser from 'src/ui/modals/languageChooser';
 import { getWordAtOffset, getWordFromTextNode, normalizeLookupTerm } from './selection';
-import { copyText } from './clipboard';
 
 export default class DictionaryPlugin extends Plugin {
     declare settings: DictionarySettings;
@@ -117,28 +116,15 @@ export default class DictionaryPlugin extends Plugin {
             if (!term) return;
 
             this.captureSelection(term);
-            event.preventDefault();
-
-            const fileMenu = new Menu();
-            if (selection.trim()) {
-                fileMenu.addItem((item) => {
-                    item.setTitle(t('Copy'))
-                        .setIcon('copy')
-                        .onClick(() => {
-                            void copyText(selection);
-                        });
-                });
-            }
-
-            fileMenu.addItem((item) => {
+            const menu = Menu.forEvent(event);
+            menu.addItem((item) => {
                 item.setTitle(`${t('Look up')} "${term}"`)
                     .setIcon('quote-glyph')
+                    .setSection('dictionary')
                     .onClick(() => {
                         void this.lookup(term);
                     });
             });
-
-            fileMenu.showAtPosition({ x: event.clientX, y: event.clientY });
         });
         
         this.registerEvent(this.app.workspace.on('editor-menu', this.handleContextMenuHelper));

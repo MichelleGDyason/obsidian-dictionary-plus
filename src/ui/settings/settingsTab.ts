@@ -122,7 +122,7 @@ export default class SettingsTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName(t('Show Options in Context Menu'))
-            .setDesc('Add dictionary lookup to editor right-click and reading-view context menus. Reading view uses a small custom menu with Copy and Look up.')
+            .setDesc('Add Look up to Obsidian right-click menus without replacing the existing link, copy, and editing actions.')
             .addToggle(toggle => {
                 toggle.setValue(plugin.settings.contextMenuLookup);
 

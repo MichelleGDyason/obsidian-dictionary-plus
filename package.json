@@ -1,6 +1,6 @@
 {
-  "name": "obsidian-dictionary-plugin",
-  "version": "3.0.0",
+  "name": "dictionary-plus",
+  "version": "3.0.1",
   "description": "Dictionary lookup, mobile selection support, and flashcard-ready lookup history for Obsidian.",
   "private": true,
   "main": "main.js",
@@ -16,7 +16,7 @@
     "flashcards",
     "spaced-repetition"
   ],
-  "author": "phibr0, Michelle Dyason, and contributors",
+  "author": "Michelle Dyason, phibr0, and contributors",
   "license": "AGPL-3.0",
   "devDependencies": {
     "@tsconfig/svelte": "^3.0.0",

@@ -1,4 +1,4 @@
-# Obsidian Dictionary Plus
+# Dictionary Plus
 
 This is an AGPL-licensed enhancement of [phibr0/obsidian-dictionary](https://github.com/phibr0/obsidian-dictionary), with mobile selection recovery, desktop right-click lookup, current provider fixes, and flashcard-ready lookup history.
 
@@ -15,7 +15,7 @@ This plugin adds a dictionary to the [Obsidian](https://obsidian.md) note-taking
 
 ### Manual
 
-Download `main.js`, `manifest.json`, and `styles.css` from the latest [release](https://github.com/MichelleGDyason/obsidian-dictionary-plus/releases), place them in `.obsidian/plugins/obsidian-dictionary-plugin/`, and reload Obsidian.
+Download `main.js`, `manifest.json`, and `styles.css` from the latest [release](https://github.com/MichelleGDyason/obsidian-dictionary-plus/releases), place them in `.obsidian/plugins/dictionary-plus/`, and reload Obsidian.
 
 ## Usage
 

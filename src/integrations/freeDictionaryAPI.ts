@@ -81,6 +81,7 @@ export class FreeDictionaryDefinitionProvider extends Base implements Definition
 export class FreeDictionarySynonymProvider extends Base implements SynonymProvider {
     public supportedLanguages: string[] = [
         "en_US",
+        "en_GB",
     ];
 
     /**

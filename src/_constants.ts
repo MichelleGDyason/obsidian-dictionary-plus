@@ -78,7 +78,7 @@ export const DEFAULT_SETTINGS: DictionarySettings = {
         },
         en_GB: {
             definitionApiName: 'Free Dictionary API',
-            synonymApiName: null,
+            synonymApiName: 'Free Dictionary API',
         },
         de: {
             definitionApiName: 'Free Dictionary API',

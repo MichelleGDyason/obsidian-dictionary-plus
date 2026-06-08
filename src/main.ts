@@ -90,7 +90,7 @@ export default class DictionaryPlugin extends Plugin {
 
         this.registerDomEvent(document.body, "pointerup", () => {
             this.captureSelection(window.getSelection()?.toString());
-            if (!this.settings.shouldShowSynonymPopover) {
+            if (!this.settings.shouldShowSynonymPopover || !this.manager.hasSynonymProvider()) {
                 return;
             }
             this.handlePointerUp();
@@ -305,6 +305,10 @@ export default class DictionaryPlugin extends Plugin {
 
     async loadSettings(): Promise<void> {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        if (this.settings.apiSettings.en_GB.synonymApiName === null) {
+            this.settings.apiSettings.en_GB.synonymApiName = 'Free Dictionary API';
+            await this.saveData(this.settings);
+        }
     }
 
     async loadCache(): Promise<void> {

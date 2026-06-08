@@ -105,7 +105,7 @@ export default class APIManager {
     public async requestSynonyms(query: string, pos?: PartOfSpeech): Promise<Synonym[]> {
         const api = this.getSynonymAPI();
         if (!api) {
-            throw ("No Synonym API selected/available");
+            return [];
         }
         const { cache, settings } = this.plugin;
         if (settings.useCaching && !api.name.toLowerCase().includes("offline")) {
@@ -124,6 +124,10 @@ export default class APIManager {
         } else {
             return api.requestSynonyms(query, this.plugin.settings.defaultLanguage, pos);
         }
+    }
+
+    public hasSynonymProvider(): boolean {
+        return Boolean(this.getSynonymAPI());
     }
 
     /**

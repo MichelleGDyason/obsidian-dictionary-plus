@@ -7,10 +7,12 @@ export interface DictionarySettings {
 	apiSettings: APISettings;
 	partOfSpeechApiName: string;
 	shouldShowSynonymPopover: boolean;
-	shouldShowCustomContextMenu: boolean;
+		contextMenuLookup: boolean;
 	advancedSynonymAnalysis: boolean;
-	useCaching: boolean;
-	folder: string;
+		useCaching: boolean;
+		saveLookupHistory: boolean;
+		lookupHistoryPath: string;
+		folder: string;
 	languageSpecificSubFolders: boolean,
 	capitalizedFileName: boolean;
 	suffix: string;

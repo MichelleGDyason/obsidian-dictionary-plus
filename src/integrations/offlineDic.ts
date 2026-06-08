@@ -28,7 +28,7 @@ export class OfflineDictionary implements DefinitionProvider {
             const definition: Definition[] = [];
             definition.push({
                 definition: lang === "cn" ? element.def_cn : element.def_en,
-                example: lang === "cn" ? element.ext?.first()?.ext_cn : element.ext?.first()?.ext_en ?? ""
+                example: lang === "cn" ? element.ext?.[0]?.ext_cn : element.ext?.[0]?.ext_en ?? ""
             });
             meanings.push({
                 partOfSpeech: lang === "cn" ? element.pos_cn : element.pos_en,
@@ -49,7 +49,7 @@ export class OfflineDictionary implements DefinitionProvider {
         const path = normalizePath(`${plugin.manifest.dir}/offlineDictionary.json`);
         if (!this.offlineDic) {
             if (!await adapter.exists(path)) {
-                const data = await request({ url: `https://github.com/phibr0/obsidian-dictionary/releases/download/${plugin.manifest.version}/dictionary.json` });
+                const data = await request({ url: `https://github.com/MichelleGDyason/obsidian-dictionary-plus/releases/download/${plugin.manifest.version}/dictionary.json` });
                 await adapter.write(path, data);
             }
             this.offlineDic = JSON.parse(await adapter.read(path));

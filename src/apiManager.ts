@@ -67,8 +67,11 @@ export default class APIManager {
         //Get the currently enabled API
         const api = this.getDefinitionAPI();
         const { cache, settings } = this.plugin;
+        if (!api) {
+            throw new Error(`No definition provider is available for ${settings.defaultLanguage}`);
+        }
 
-        if (settings.useCaching && !api.name.toLowerCase().contains("offline")) {
+        if (settings.useCaching && !api.name.toLowerCase().includes("offline")) {
             const cachedDefinition = cache.cachedDefinitions.find((c) => { return c.content.word.toLowerCase() == query.toLowerCase() && c.lang == settings.defaultLanguage && c.api == api.name });
             //If cachedDefiniton exists return it as a Promise
             if (cachedDefinition) {
@@ -105,7 +108,7 @@ export default class APIManager {
             throw ("No Synonym API selected/available");
         }
         const { cache, settings } = this.plugin;
-        if (settings.useCaching && !api.name.toLowerCase().contains("offline")) {
+        if (settings.useCaching && !api.name.toLowerCase().includes("offline")) {
             const cachedSynonymCollection = cache.cachedSynonyms.find((s) => { return s.word.toLowerCase() == query.toLowerCase() && s.lang == settings.defaultLanguage && s.api == api.name });
             if (cachedSynonymCollection) {
                 return new Promise((resolve) => resolve(cachedSynonymCollection.content));

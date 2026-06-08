@@ -89,6 +89,6 @@ export class GoogleScraperSynonymProvider extends Base implements SynonymProvide
   }
 
   async requestSynonyms(query: string, lang: string, _?: PartOfSpeech): Promise<Synonym[]> {
-      return (await this.provider.requestDefinitions(query, lang)).meanings.first().definitions.first().synonyms.map<Synonym>(synonym => { return { word: synonym } });
+      return (await this.provider.requestDefinitions(query, lang)).meanings[0].definitions[0].synonyms.map<Synonym>(synonym => { return { word: synonym } });
   }
 }

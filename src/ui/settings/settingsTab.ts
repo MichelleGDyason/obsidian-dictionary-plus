@@ -51,12 +51,12 @@ export default class SettingsTab extends PluginSettingTab {
             .addDropdown((dropdown) => {
                 const list: Record<string, string> = {};
                 for (const api of plugin.manager.definitionProvider) {
-                    if (api.supportedLanguages.contains(plugin.settings.defaultLanguage)) {
+                    if (api.supportedLanguages.includes(plugin.settings.defaultLanguage)) {
                         list[api.name] = api.name;
                     }
                 }
                 dropdown.addOptions(list)
-                    .setValue(plugin.settings.apiSettings[plugin.settings.defaultLanguage].definitionApiName ?? Object.keys(list).first())
+                    .setValue(plugin.settings.apiSettings[plugin.settings.defaultLanguage].definitionApiName ?? Object.keys(list)[0])
                     .onChange(async (value) => {
                         plugin.settings.apiSettings[plugin.settings.defaultLanguage].definitionApiName = value;
                         await this.save();
@@ -68,12 +68,12 @@ export default class SettingsTab extends PluginSettingTab {
             .addDropdown((dropdown) => {
                 const list: Record<string, string> = {};
                 for (const api of plugin.manager.synonymProvider) {
-                    if (api.supportedLanguages.contains(plugin.settings.defaultLanguage)) {
+                    if (api.supportedLanguages.includes(plugin.settings.defaultLanguage)) {
                         list[api.name] = api.name;
                     }
                 }
                 dropdown.addOptions(list)
-                    .setValue(plugin.settings.apiSettings[plugin.settings.defaultLanguage].synonymApiName ?? Object.keys(list).first())
+                    .setValue(plugin.settings.apiSettings[plugin.settings.defaultLanguage].synonymApiName ?? Object.keys(list)[0])
                     .onChange(async (value) => {
                         plugin.settings.apiSettings[plugin.settings.defaultLanguage].synonymApiName = value;
                         await this.save();
@@ -102,7 +102,7 @@ export default class SettingsTab extends PluginSettingTab {
                 desc.createEl("br"),
                 t('Click '),
                 desc.createEl("a", {
-                    href: "https://github.com/phibr0/obsidian-dictionary#privacy",
+                    href: "https://github.com/MichelleGDyason/obsidian-dictionary-plus#privacy",
                     text: t('here')
                 }),
                 t(' for Privacy Concerns.'),
@@ -122,23 +122,19 @@ export default class SettingsTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName(t('Show Options in Context Menu'))
-            .setDesc(t('Enable custom Context Menu with options to search for synonyms (only if the auto suggestions are disabled) and to look up a full definition in the Sidebar. Warning: This will override Obsidian\'s default Context Menu.'))
+            .setDesc('Add dictionary lookup to editor right-click and reading-view context menus. Reading view uses a small custom menu with Copy and Look up.')
             .addToggle(toggle => {
-                if (plugin.settings.shouldShowCustomContextMenu) {
-                    toggle.setValue(true)
-                } else {
-                    toggle.setValue(false)
-                }
+                toggle.setValue(plugin.settings.contextMenuLookup);
 
                 toggle.onChange(async (value) => {
-                    plugin.settings.shouldShowCustomContextMenu = value;
+                    plugin.settings.contextMenuLookup = value;
                     await this.save();
                 })
             });
         containerEl.createEl('h3', { text: t("Local-Dictionary-Builder Settings") });
         new Setting(containerEl)
             .setName(t('Local Dictionary Folder'))
-            .setDesc(t('Specify a Folder, where all new Notes created by the Dictionary are placed. Please note that this Folder needs to already exist.'))
+            .setDesc('Specify where full dictionary notes are created. Parent folders are created automatically.')
             .addText(text => text
                 .setPlaceholder(t('Dictionary'))
                 .setValue(plugin.settings.folder)
@@ -146,6 +142,29 @@ export default class SettingsTab extends PluginSettingTab {
                     plugin.settings.folder = value;
                     await this.save();
                 }));
+        new Setting(containerEl)
+            .setName('Save successful lookups to flashcards')
+            .setDesc('Append each newly looked-up word to one #flashcards note using the Question::Answer format supported by the Spaced Repetition plugin.')
+            .addToggle(toggle => {
+                toggle.setValue(plugin.settings.saveLookupHistory)
+                    .onChange(async (value) => {
+                        plugin.settings.saveLookupHistory = value;
+                        await this.save();
+                        this.display();
+                    });
+            });
+        new Setting(containerEl)
+            .setName('Lookup history note')
+            .setDesc('The note that stores unique dictionary lookup flashcards. Parent folders are created automatically.')
+            .addText(text => {
+                text.setPlaceholder('Dictionary/Lookup history.md')
+                    .setValue(plugin.settings.lookupHistoryPath)
+                    .setDisabled(!plugin.settings.saveLookupHistory)
+                    .onChange(async (value) => {
+                        plugin.settings.lookupHistoryPath = value;
+                        await this.save();
+                    });
+            });
         new Setting(containerEl)
             .setName(t('Use Language specific Subfolders'))
             .setDesc(t('Create Subfolders for every language, e.g. "Dictionary/en-US/Cake"'))
@@ -189,7 +208,7 @@ export default class SettingsTab extends PluginSettingTab {
             t('Here you can edit the Template for newly created Files.'),
             templateDescription.createEl("br"),
             templateDescription.createEl("a", {
-                href: "https://github.com/phibr0/obsidian-dictionary#variables",
+                href: "https://github.com/MichelleGDyason/obsidian-dictionary-plus#variables",
                 text: t('Click for a List of Variables'),
             }),
         );

@@ -31,6 +31,13 @@
 
     document.body.addEventListener("pointerup", onBodyPointerUp);
   }
+
+  function selectOnKeyboard(event: KeyboardEvent, word: string) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelect(word);
+    }
+  }
 </script>
 
 <div
@@ -40,7 +47,13 @@
   in:fade="{{ duration: 50 }}"
 >
   {#each synonyms as synonym}
-    <div class="dict-s-popover__select-option" on:click={() => onSelect(synonym.word)}>
+    <div
+      class="dict-s-popover__select-option"
+      role="button"
+      tabindex="0"
+      on:click={() => onSelect(synonym.word)}
+      on:keydown={(event) => selectOnKeyboard(event, synonym.word)}
+    >
       <div class="dict-s-popover__select-label">
         <div class="dict-s-popover__term">{synonym.word}</div>
         {#if !!synonym.partsOfSpeech?.length}

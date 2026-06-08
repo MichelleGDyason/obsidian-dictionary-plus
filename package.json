@@ -1,34 +1,34 @@
 {
-  "name": "obsidian-sample-plugin",
-  "version": "0.12.0",
-  "description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+  "name": "obsidian-dictionary-plugin",
+  "version": "3.0.0",
+  "description": "Dictionary lookup, mobile selection support, and flashcard-ready lookup history for Obsidian.",
+  "private": true,
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "node esbuild.config.mjs production"
+    "build": "node esbuild.config.mjs production",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "MIT",
+  "keywords": [
+    "obsidian",
+    "dictionary",
+    "flashcards",
+    "spaced-repetition"
+  ],
+  "author": "phibr0, Michelle Dyason, and contributors",
+  "license": "AGPL-3.0",
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^18.0.0",
-    "@rollup/plugin-node-resolve": "^11.2.1",
-    "@rollup/plugin-typescript": "^8.2.1",
-    "@tsconfig/svelte": "^1.0.13",
-    "@types/node": "^14.14.37",
-    "@typescript-eslint/eslint-plugin": "^4.25.0",
-    "@typescript-eslint/parser": "^4.25.0",
-    "esbuild": "^0.12.26",
-    "esbuild-svelte": "^0.5.4",
-    "eslint": "^7.27.0",
-    "sass": "^1.39.0",
-    "scss": "^0.2.4",
-    "svelte": "^3.40.3",
-    "svelte-check": "^1.4.0",
-    "svelte-preprocess": "^4.7.0",
-    "tslib": "^2.2.0",
-    "typescript": "^4.3.2",
-    "typescript-eslint": "^0.0.1-alpha.0"
+    "@tsconfig/svelte": "^3.0.0",
+    "@types/node": "^22.15.0",
+    "esbuild": "^0.28.0",
+    "esbuild-svelte": "^0.9.5",
+    "sass": "^1.100.0",
+    "svelte": "^4.2.20",
+    "svelte-check": "^3.8.6",
+    "svelte-preprocess": "^5.1.4",
+    "tslib": "^2.8.1",
+    "typescript": "5.8.3"
   },
   "moduleFileExtensions": [
     "js",
@@ -37,7 +37,6 @@
   ],
   "dependencies": {
     "match-casing": "^2.0.0",
-    "obsidian": "^0.12.5",
-    "obsidian-community-lib": "^0.0.16"
+    "obsidian": "^1.13.0"
   }
 }

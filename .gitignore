@@ -4,14 +4,17 @@
 
 # npm
 node_modules
-package-lock.json
 yarn.lock
 
 # build
 main.js
+main.css
 *.js.map
 
 # obsidian
 data.json
 cache.json
 offlineDictionary.json
+
+# macOS
+.DS_Store

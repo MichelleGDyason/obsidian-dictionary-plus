@@ -19,15 +19,19 @@
   let promise: Promise<DictionaryWord>;
   let buttons: HTMLElement[] = [];
 
-  onMount(() =>
-    setTimeout(() => {
-      setIcon(buttons[0], "languages", 20);
-      setIcon(buttons[1], "cloud", 20);
-      setIcon(buttons[2], "bullet-list", 20);
-      setIcon(buttons[3], "uppercase-lowercase-a", 20);
-      setIcon(buttons[4], "documents", 20);
-    }, 0)
-  );
+  onMount(() => {
+    const iconTimer = window.setTimeout(() => {
+      setIcon(buttons[0], "languages");
+      setIcon(buttons[1], "cloud");
+      setIcon(buttons[2], "bullet-list");
+      setIcon(buttons[3], "uppercase-lowercase-a");
+      setIcon(buttons[4], "documents");
+    }, 0);
+
+    return () => {
+      window.clearTimeout(iconTimer);
+    };
+  });
 
   const debouncedSearch = debounce(search, 800, true);
 
@@ -35,9 +39,17 @@
   function search() {
     if (query.trim()) {
       lastQuery = query;
-      promise = manager.requestDefinitions(
+      const currentRequest = manager.requestDefinitions(
         matchCase ? query : query.toLowerCase()
       );
+      promise = currentRequest;
+      currentRequest
+        .then((result) => {
+          if (promise === currentRequest) {
+            return localDictionary.recordLookup(result);
+          }
+        })
+        .catch(() => undefined);
     }
   }
 
@@ -65,15 +77,30 @@
     }
   }
 
+  function activateOnKeyboard(event: KeyboardEvent, action: () => void) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      action();
+    }
+  }
+
   function clear() {
     query = "";
     lastQuery = null;
     promise = null;
-    //@ts-ignore
-    document.querySelector("#dictionary-search-input").focus();
+    document.querySelector<HTMLInputElement>("#dictionary-search-input")?.focus();
   }
 
-  async function generateNote(event: MouseEvent) {
+  export function searchFor(value: string) {
+    query = value;
+    search();
+  }
+
+  export function focusSearch() {
+    document.querySelector<HTMLInputElement>("#dictionary-search-input")?.focus();
+  }
+
+  async function generateNote(event: MouseEvent | KeyboardEvent) {
     if (query.trim() && promise) {
       await localDictionary.newNote(
         await promise,
@@ -81,16 +108,6 @@
       );
     }
   }
-
-  addEventListener("obsidian-dictionary-plugin-search", (event: CustomEvent) => {
-    query = event.detail.query;
-    search();
-  });
-
-  addEventListener("dictionary-focus-on-search", () => {
-    const el = document.querySelector("#dictionary-search-input") as HTMLInputElement;
-    el.focus();
-  })
 </script>
 
 <div class="nav-buttons-container">
@@ -98,38 +115,53 @@
     id="languageModal"
     class="nav-action-button"
     aria-label={t("Change Language")}
+    role="button"
+    tabindex="0"
     bind:this={buttons[0]}
     on:click={languageModal}
+    on:keydown={(event) => activateOnKeyboard(event, languageModal)}
   />
   <div
     id="apiModal"
     class="nav-action-button"
     aria-label={t("Change Provider")}
+    role="button"
+    tabindex="0"
     bind:this={buttons[1]}
     on:click={apiModal}
+    on:keydown={(event) => activateOnKeyboard(event, apiModal)}
   />
   <div
     id="openAndCloseAll"
     class="nav-action-button"
     class:is-active={detailsOpen}
     aria-label={t("Collapse Results")}
+    role="button"
+    tabindex="0"
     bind:this={buttons[2]}
     on:click={toggleContainer}
+    on:keydown={(event) => activateOnKeyboard(event, toggleContainer)}
   />
   <div
     id="matchCaseBtn"
     class="nav-action-button"
     class:is-active={matchCase}
     aria-label={t("Match Case")}
+    role="button"
+    tabindex="0"
     bind:this={buttons[3]}
     on:click={() => (matchCase = !matchCase)}
+    on:keydown={(event) => activateOnKeyboard(event, () => (matchCase = !matchCase))}
   />
   <div
     id="localDictionaryBuilder"
     class="nav-action-button"
     aria-label={t("New Note")}
+    role="button"
+    tabindex="0"
     bind:this={buttons[4]}
     on:click={generateNote}
+    on:keydown={(event) => activateOnKeyboard(event, () => generateNote(event))}
   />
 </div>
 <div class="search-input-container">
@@ -147,6 +179,9 @@
       class="search-input-clear-button"
       on:click={clear}
       aria-label={t("Clear")}
+      role="button"
+      tabindex="0"
+      on:keydown={(event) => activateOnKeyboard(event, clear)}
     />
   {/if}
 </div>
@@ -158,7 +193,7 @@
       </div>
     {:then data}
       <div class="results">
-        {#if data.phonetics?.first()?.text}
+        {#if data.phonetics?.[0]?.text}
           <div class="container">
             <h3>{t("Pronunciation")}</h3>
             {#each data.phonetics as { text, audio }}

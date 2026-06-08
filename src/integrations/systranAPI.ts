@@ -101,7 +101,7 @@ export class SystranPOSProvider implements PartOfSpeechProvider {
 
         if (!match && words.partsOfSpeech) {
             match = words.partsOfSpeech.find(pos => {
-                return pos.text.contains(word);
+                return pos.text.includes(word);
             })
         }
 

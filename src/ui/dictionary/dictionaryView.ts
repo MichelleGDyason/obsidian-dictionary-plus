@@ -10,6 +10,7 @@ export default class DictionaryView extends ItemView {
 
     plugin: DictionaryPlugin;
     private _view: DictionaryComponent;
+    private pendingQuery: string | null = null;
 
     constructor(leaf: WorkspaceLeaf, plugin: DictionaryPlugin) {
         super(leaf);
@@ -17,7 +18,15 @@ export default class DictionaryView extends ItemView {
     }
 
     query(query: string): void {
-        dispatchEvent(new CustomEvent("obsidian-dictionary-plugin-search", { detail: { query } }));
+        if (this._view) {
+            this._view.searchFor(query);
+        } else {
+            this.pendingQuery = query;
+        }
+    }
+
+    focusSearch(): void {
+        this._view?.focusSearch();
     }
 
     getViewType(): string {
@@ -46,6 +55,10 @@ export default class DictionaryView extends ItemView {
             }
         });
         this.contentEl.addClass("dictionary-view-content");
+        if (this.pendingQuery) {
+            this._view.searchFor(this.pendingQuery);
+            this.pendingQuery = null;
+        }
         addEventListener('dictionary-open-language-switcher', () => {
             new LanguageChooser(this.app, this.plugin).open();
         });

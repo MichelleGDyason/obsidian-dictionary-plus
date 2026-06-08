@@ -1,12 +1,44 @@
-<img align="right" style="width: 27vw" src="https://media.discordapp.net/attachments/796853434397360128/847198380878069771/Screen_Shot_2021-05-26_at_12.43.43_PM.png?width=736&height=676">
+# Obsidian Dictionary Plus
 
-# Obsidian Dictionary Plugin [![GitHub tag (Latest by date)](https://img.shields.io/github/v/tag/phibr0/obsidian-dictionary)](https://github.com/phibr0/obsidian-dictionary/releases) ![GitHub all releases](https://img.shields.io/github/downloads/phibr0/obsidian-dictionary/total)
+This is an AGPL-licensed enhancement of [phibr0/obsidian-dictionary](https://github.com/phibr0/obsidian-dictionary), with mobile selection recovery, desktop right-click lookup, current provider fixes, and flashcard-ready lookup history.
 
-This Plugin adds a Dictionary to the [Obsidian](https://obsidian.md) Note-Taking tool.
+This plugin adds a dictionary to the [Obsidian](https://obsidian.md) note-taking tool.
+
+## Install this version
+
+### BRAT
+
+1. Install and enable the **BRAT** community plugin.
+2. Run **BRAT: Add a beta plugin for testing**.
+3. Enter `MichelleGDyason/obsidian-dictionary-plus`.
+4. Disable the original Dictionary community plugin if Obsidian shows both versions, then enable **Dictionary Plus**.
+
+### Manual
+
+Download `main.js`, `manifest.json`, and `styles.css` from the latest [release](https://github.com/MichelleGDyason/obsidian-dictionary-plus/releases), place them in `.obsidian/plugins/obsidian-dictionary-plugin/`, and reload Obsidian.
 
 ## Usage
 
 Open the *Command Palette* (default: `ctrl` + `p`), search for *Open Dictionary View* and run the command. You will see that a new View appears in the right Sidebar of Obsidian. You can set your default Language in Obsidian's Settings under *Plugin Options* > *Obsidian Dictionary* > *Default Language*.
+
+### Look up selected text
+
+- **Desktop:** select a word or place the cursor inside it, then right-click and choose **Look up**.
+- **Mobile:** select a word, then run **Dictionary: Look up selected word** from the command palette. The plugin remembers the selection before the mobile menu collapses it.
+- You can assign a hotkey to **Dictionary: Look up selected word** in Obsidian's Hotkeys settings.
+- Reading view also supports right-click or long-press lookup. **Show Options in Context Menu** is enabled by default in this version.
+
+Selections are trimmed of surrounding punctuation. Phrases containing spaces are rejected because the configured dictionary providers expect one word.
+
+### Lookup history and flashcards
+
+Successful lookups are saved by default to `Dictionary/Lookup history.md`. The note is tagged `#flashcards` and each unique word is written in the single-line format used by the [Obsidian Spaced Repetition plugin](https://github.com/st3v3nmw/obsidian-spaced-repetition):
+
+```md
+dictionary::noun: a reference source containing words and their meanings
+```
+
+Use **Dictionary: Open lookup history** to open the note. The automatic history and its path can be changed in Dictionary settings. The existing **New Note** button still creates a full dictionary note for the current result.
 
 ## Supported Languages
 
@@ -66,7 +98,7 @@ Even though this Plugin is fully Open-Source and thus can be looked over by anyo
 
 ### Translations
 
-If you want to help and translate this Plugin to new languages, see [locales](https://github.com/phibr0/obsidian-dictionary/tree/master/src/l10n/locale).
+If you want to help and translate this plugin to new languages, see [locales](https://github.com/MichelleGDyason/obsidian-dictionary-plus/tree/main/src/l10n/locale).
 
 ### New API's
 
@@ -95,13 +127,6 @@ You can edit the Note Template for your local Dictionary in the Settings. Here i
 - `{{origin}}` → Same as above, but for the word origin the Plugin found.
 
 Localized means, that the Text changes based on Obsidians internal Language.
-
-## How to install
-
-1. Go to **Community Plugins** in your [Obsidian](https://www.obsidian.md) Settings and **disable** Safe Mode
-2. Click on **Browse** and search for “Obsidian Dictionary”
-3. Click install
-4. Toggle the Plugin on in the **Community Plugins** Tab
 
 ## Support me
 

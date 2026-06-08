@@ -9,13 +9,13 @@ abstract class Base {
     offline = false;
 
     languageCodes = {
-        "en_US": "en_US",
+        "en_US": "en",
         "hi": "hi",
         "es": "es",
         "fr": "fr",
         "ja": "ja",
         "ru": "ru",
-        "en_GB": "en_GB",
+        "en_GB": "en",
         "de": "de",
         "it": "it",
         "ko": "ko",
@@ -74,7 +74,7 @@ export class FreeDictionaryDefinitionProvider extends Base implements Definition
             return Promise.reject(json["title"]);
         }
 
-        return json.first();
+        return json[0];
     }
 }
 
@@ -91,13 +91,13 @@ export class FreeDictionarySynonymProvider extends Base implements SynonymProvid
     getDoesPosMatch(meaning: Meaning, pos: PartOfSpeech): boolean {
         switch (pos) {
         case PartOfSpeech.Noun:
-            return meaning.partOfSpeech.toLowerCase().contains('noun');
+            return meaning.partOfSpeech.toLowerCase().includes('noun');
         case PartOfSpeech.Verb:
-            return meaning.partOfSpeech.toLowerCase().contains('verb');
+            return meaning.partOfSpeech.toLowerCase().includes('verb');
         case PartOfSpeech.Adjective:
-            return meaning.partOfSpeech.toLowerCase().contains('adjective');
+            return meaning.partOfSpeech.toLowerCase().includes('adjective');
         case PartOfSpeech.Adverb:
-            return meaning.partOfSpeech.toLowerCase().contains('adverb');
+            return meaning.partOfSpeech.toLowerCase().includes('adverb');
         }
     }
 
@@ -120,7 +120,7 @@ export class FreeDictionarySynonymProvider extends Base implements SynonymProvid
             return Promise.reject("Word doesnt exist in this Dictionary");
         }
 
-        const meanings: Meaning[] = (await JSON.parse(result) as DictionaryWord[]).first().meanings;
+        const meanings: Meaning[] = (await JSON.parse(result) as DictionaryWord[])[0].meanings;
         const synonyms: Synonym[] = [];
 
         // The default POS provider seems pretty wonky at the moment,
@@ -128,7 +128,7 @@ export class FreeDictionarySynonymProvider extends Base implements SynonymProvid
         const nonPOSMatch: Synonym[] = [];
 
         meanings.forEach(meaning => {
-            if (Number.isNumber(pos) && !this.getDoesPosMatch(meaning, pos)) {
+            if (typeof pos === 'number' && !this.getDoesPosMatch(meaning, pos)) {
                 meaning.definitions.forEach(def => {
                     if (def.synonyms) {
                         def.synonyms.forEach(synonym => {

@@ -50,7 +50,7 @@ export const DEFAULT_SETTINGS: DictionarySettings = {
     defaultLanguage: "en_US",
     normalLang: 'en_US',
     shouldShowSynonymPopover: true,
-    shouldShowCustomContextMenu: false,
+    contextMenuLookup: true,
     apiSettings: {
         en_US: {
             definitionApiName: 'Free Dictionary API',
@@ -112,6 +112,8 @@ export const DEFAULT_SETTINGS: DictionarySettings = {
     partOfSpeechApiName: "Systran API",
     advancedSynonymAnalysis: false,
     useCaching: false,
+    saveLookupHistory: true,
+    lookupHistoryPath: "Dictionary/Lookup history.md",
     folder: '',
     capitalizedFileName: true,
     prefix: "",
@@ -137,4 +139,3 @@ aliases: ["{{word}}"]
 `,
     languageSpecificSubFolders: false
 }
-

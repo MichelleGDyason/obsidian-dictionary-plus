@@ -4,7 +4,8 @@ import type DictionaryPlugin from "src/main";
 import type { DictionarySettings } from "src/types";
 
 import t from "src/l10n/helpers";
-import { MarkdownView, Modal, normalizePath, TFile } from "obsidian";
+import { MarkdownView, Modal, normalizePath, Notice, TFile } from "obsidian";
+import { buildFlashcardEntry } from "./flashcards";
 
 //This really needs a refactor
 
@@ -98,19 +99,109 @@ export default class LocalDictionaryBuilder {
                 .replace(/{{origin}}/ig, '');
         }
 
+        const normalizedPath = normalizePath(path);
+        const existingFile = plugin.app.vault.getAbstractFileByPath(normalizedPath);
+        if (existingFile instanceof TFile) {
+            new OverwriteModal(this.plugin, normalizePath(path), contents, openNote).open();
+            return;
+        }
+
         try {
-            if (!(await plugin.app.vault.adapter.exists(normalizePath(`${settings.folder ? settings.folder + '/' : ''}${settings.languageSpecificSubFolders ? langString + '/' : ''}`)))) {
-                await plugin.app.vault.createFolder(normalizePath(`${settings.folder ? settings.folder + '/' : ''}${settings.languageSpecificSubFolders ? langString + '/' : ''}`));
-            }
-            file = await plugin.app.vault.create(normalizePath(path), contents);
+            await this.ensureParentFolders(normalizedPath);
+            file = await plugin.app.vault.create(normalizedPath, contents);
             if (openNote) {
-                const leaf = plugin.app.workspace.splitActiveLeaf();
-                await leaf.openFile(file);
-                plugin.app.workspace.setActiveLeaf(leaf);
+                await this.openFile(file);
             }
         } catch (error) {
-            new OverwriteModal(this.plugin, normalizePath(path), contents, openNote).open();
+            console.error('Failed to create dictionary note', error);
+            new Notice(`Could not create dictionary note: ${this.errorMessage(error)}`);
         }
+    }
+
+    async recordLookup(content: DictionaryWord): Promise<void> {
+        if (!this.settings.saveLookupHistory) return;
+
+        const path = this.getLookupHistoryPath();
+        const language = RFC[this.settings.defaultLanguage];
+        const entry = buildFlashcardEntry(content, language);
+        if (!entry) return;
+
+        try {
+            await this.ensureParentFolders(path);
+            const existing = this.plugin.app.vault.getAbstractFileByPath(path);
+            if (!existing) {
+                await this.plugin.app.vault.create(
+                    path,
+                    `# Dictionary lookup flashcards\n\n#flashcards\n\n${entry.markdown}`
+                );
+                return;
+            }
+            if (!(existing instanceof TFile)) {
+                throw new Error(`A folder already exists at ${path}`);
+            }
+
+            const current = await this.plugin.app.vault.read(existing);
+            if (!current.includes(entry.marker)) {
+                const separator = current.endsWith('\n') ? '\n' : '\n\n';
+                await this.plugin.app.vault.modify(existing, `${current}${separator}${entry.markdown}`);
+            }
+        } catch (error) {
+            console.error('Failed to save dictionary lookup history', error);
+            new Notice(`Could not save dictionary lookup history: ${this.errorMessage(error)}`);
+        }
+    }
+
+    async openLookupHistory(): Promise<void> {
+        const path = this.getLookupHistoryPath();
+        try {
+            await this.ensureParentFolders(path);
+            let file = this.plugin.app.vault.getAbstractFileByPath(path);
+            if (!file) {
+                file = await this.plugin.app.vault.create(
+                    path,
+                    '# Dictionary lookup flashcards\n\n#flashcards\n'
+                );
+            }
+            if (!(file instanceof TFile)) {
+                throw new Error(`A folder already exists at ${path}`);
+            }
+            await this.openFile(file);
+        } catch (error) {
+            console.error('Failed to open dictionary lookup history', error);
+            new Notice(`Could not open dictionary lookup history: ${this.errorMessage(error)}`);
+        }
+    }
+
+    private getLookupHistoryPath(): string {
+        const configuredPath = this.settings.lookupHistoryPath.trim() || 'Dictionary/Lookup history.md';
+        return normalizePath(configuredPath.toLowerCase().endsWith('.md')
+            ? configuredPath
+            : `${configuredPath}.md`);
+    }
+
+    private async ensureParentFolders(filePath: string): Promise<void> {
+        const segments = normalizePath(filePath).split('/').slice(0, -1);
+        let currentPath = '';
+
+        for (const segment of segments) {
+            currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+            const existing = this.plugin.app.vault.getAbstractFileByPath(currentPath);
+            if (!existing) {
+                await this.plugin.app.vault.createFolder(currentPath);
+            } else if (existing instanceof TFile) {
+                throw new Error(`A file blocks the folder ${currentPath}`);
+            }
+        }
+    }
+
+    private async openFile(file: TFile): Promise<void> {
+        const leaf = this.plugin.app.workspace.getLeaf(true);
+        await leaf.openFile(file);
+        this.plugin.app.workspace.setActiveLeaf(leaf);
+    }
+
+    private errorMessage(error: unknown): string {
+        return error instanceof Error ? error.message : String(error);
     }
 }
 
@@ -141,7 +232,7 @@ class OverwriteModal extends Modal {
                 }
             });
             if (!oldPaneOpen && this.openNote) {
-                const leaf = this.app.workspace.splitActiveLeaf();
+                const leaf = this.app.workspace.getLeaf(true);
                 await leaf.openFile(this.app.vault.getAbstractFileByPath(this.path) as TFile);
                 this.app.workspace.setActiveLeaf(leaf);
             }

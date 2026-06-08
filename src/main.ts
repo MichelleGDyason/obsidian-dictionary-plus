@@ -3,7 +3,7 @@
 import type { DictionaryCache, DictionarySettings } from 'src/types';
 import type { APISettings } from './types';
 
-import { debounce, Editor, MarkdownView, Menu, normalizePath, Plugin, WorkspaceLeaf } from 'obsidian';
+import { debounce, Editor, MarkdownView, Menu, normalizePath, Notice, Platform, Plugin, WorkspaceLeaf } from 'obsidian';
 import { matchCasing } from "match-casing";
 import SettingsTab from 'src/ui/settings/settingsTab';
 import DictionaryView from 'src/ui/dictionary/dictionaryView';
@@ -16,14 +16,18 @@ import { addIcons } from 'src/ui/icons';
 import t from 'src/l10n/helpers';
 import LocalDictionaryBuilder from 'src/localDictionaryBuilder';
 import LanguageChooser from 'src/ui/modals/languageChooser';
-import { copy } from 'obsidian-community-lib';
+import { getWordAtOffset, getWordFromTextNode, normalizeLookupTerm } from './selection';
+import { copyText } from './clipboard';
 
 export default class DictionaryPlugin extends Plugin {
-    settings: DictionarySettings;
+    declare settings: DictionarySettings;
     manager: APIManager;
     localDictionary: LocalDictionaryBuilder;
     synonymPopover: SynonymPopover | null = null;
     cache: DictionaryCache;
+    private lastSelectedTerm: string | null = null;
+    private lastSelectionFilePath: string | null = null;
+    private lastSelectionAt = 0;
 
     async onload(): Promise<void> {
         console.log('loading dictionary');
@@ -35,6 +39,7 @@ export default class DictionaryPlugin extends Plugin {
         this.addSettingTab(new SettingsTab(this.app, this));
 
         this.manager = new APIManager(this);
+        this.localDictionary = new LocalDictionaryBuilder(this);
 
         this.registerView(VIEW_TYPE, (leaf) => {
             return new DictionaryView(leaf, this);
@@ -44,13 +49,31 @@ export default class DictionaryPlugin extends Plugin {
             id: 'dictionary-open-view',
             name: t('Open Dictionary View'),
             callback: async () => {
-                if (this.app.workspace.getLeavesOfType(VIEW_TYPE).length == 0) {
-                    await this.app.workspace.getRightLeaf(false).setViewState({
-                        type: VIEW_TYPE,
-                    });
+                const leaf = await this.getDictionaryLeaf();
+                if (!leaf) return;
+                this.app.workspace.revealLeaf(leaf);
+                if (leaf.view instanceof DictionaryView) {
+                    leaf.view.focusSearch();
                 }
-                this.app.workspace.revealLeaf(this.app.workspace.getLeavesOfType(VIEW_TYPE).first());
-                dispatchEvent(new Event("dictionary-focus-on-search"));
+            },
+        });
+
+        this.addCommand({
+            id: 'dictionary-lookup-selected-word',
+            name: 'Look up selected word',
+            checkCallback: (checking) => {
+                const term = this.getLookupTerm();
+                if (!term) return false;
+                if (!checking) void this.lookup(term);
+                return true;
+            },
+        });
+
+        this.addCommand({
+            id: 'dictionary-open-lookup-history',
+            name: 'Open lookup history',
+            callback: () => {
+                void this.localDictionary.openLookupHistory();
             },
         });
 
@@ -62,7 +85,12 @@ export default class DictionaryPlugin extends Plugin {
             },
         });
 
+        this.registerDomEvent(document, "selectionchange", () => {
+            this.captureSelection(window.getSelection()?.toString());
+        });
+
         this.registerDomEvent(document.body, "pointerup", () => {
+            this.captureSelection(window.getSelection()?.toString());
             if (!this.settings.shouldShowSynonymPopover) {
                 return;
             }
@@ -77,64 +105,51 @@ export default class DictionaryPlugin extends Plugin {
         });
 
         this.registerDomEvent(document.body, "contextmenu", (event) => {
-            //@ts-ignore
-            if (this.settings.shouldShowCustomContextMenu && event.path.find((el: HTMLElement) => {
-                try {
-                    return el.hasClass("markdown-preview-view");
-                } catch (error) {
-                    return false;
-                }
-            })) {
-                const selection = window.getSelection().toString();
-                if (selection && this.app.workspace.activeLeaf?.getViewState()?.state.mode === "preview") {
-                    event.preventDefault();
-
-                    const fileMenu = new Menu(this.app);
-
-                    fileMenu.addItem((item) => {
-                        item.setTitle(t('Copy'))
-                            .setIcon('copy')
-                            .onClick((_) => {
-                                copy(selection);
-                            });
-                    });
-
-                    if (selection.trim().split(" ").length === 1) {
-                        fileMenu.addItem((item) => {
-                            item.setTitle(t('Look up'))
-                                .setIcon('quote-glyph')
-                                .onClick(async (_) => {
-                                    let leaf: WorkspaceLeaf = this.app.workspace.getLeavesOfType(VIEW_TYPE).first();
-                                    if (!leaf) {
-                                        leaf = this.app.workspace.getRightLeaf(false);
-                                        await leaf.setViewState({
-                                            type: VIEW_TYPE,
-                                        });
-                                    }
-                                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                                    //@ts-ignore
-                                    leaf.view.query(selection.trim());
-                                    this.app.workspace.revealLeaf(leaf);
-                                });
-                        });
-                    }
-
-                    fileMenu.showAtPosition({ x: event.clientX, y: event.clientY });
-                }
+            if (!this.settings.contextMenuLookup || !this.isReadingViewEvent(event)) {
+                return;
             }
-        });
 
-        this.localDictionary = new LocalDictionaryBuilder(this);
+            const selection = window.getSelection()?.toString() ?? "";
+            const term = normalizeLookupTerm(selection)
+                ?? this.getWordAtPoint(event.clientX, event.clientY)
+                ?? this.getCachedSelection();
+
+            if (!term) return;
+
+            this.captureSelection(term);
+            event.preventDefault();
+
+            const fileMenu = new Menu();
+            if (selection.trim()) {
+                fileMenu.addItem((item) => {
+                    item.setTitle(t('Copy'))
+                        .setIcon('copy')
+                        .onClick(() => {
+                            void copyText(selection);
+                        });
+                });
+            }
+
+            fileMenu.addItem((item) => {
+                item.setTitle(`${t('Look up')} "${term}"`)
+                    .setIcon('quote-glyph')
+                    .onClick(() => {
+                        void this.lookup(term);
+                    });
+            });
+
+            fileMenu.showAtPosition({ x: event.clientX, y: event.clientY });
+        });
         
         this.registerEvent(this.app.workspace.on('editor-menu', this.handleContextMenuHelper));
 
         this.registerEvent(this.app.workspace.on('file-open', (file) => {
             if (file && this.settings.getLangFromFile) {
-                let lang = this.app.metadataCache.getFileCache(file).frontmatter?.lang ?? null;
+                let lang = this.app.metadataCache.getFileCache(file)?.frontmatter?.lang ?? null;
                 if (!lang) {
-                    lang = this.app.metadataCache.getFileCache(file).frontmatter?.language ?? null;
+                    lang = this.app.metadataCache.getFileCache(file)?.frontmatter?.language ?? null;
                 }
-                if (lang && Object.values(RFC).contains(lang)) {
+                if (lang && Object.values(RFC).includes(lang)) {
                     this.settings.defaultLanguage = Object.keys(RFC)[Object.values(RFC).indexOf(lang)] as keyof APISettings;
                 } else {
                     this.settings.defaultLanguage = this.settings.normalLang;
@@ -151,6 +166,105 @@ export default class DictionaryPlugin extends Plugin {
     handleContextMenuHelper = (menu: Menu, editor: Editor, _: MarkdownView): void => {
         handleContextMenu(menu, editor, this);
     };
+
+    captureSelection(value: string | null | undefined): string | null {
+        const term = normalizeLookupTerm(value);
+        if (!term) return null;
+
+        this.lastSelectedTerm = term;
+        this.lastSelectionFilePath = this.app.workspace.getActiveFile()?.path ?? null;
+        this.lastSelectionAt = Date.now();
+        return term;
+    }
+
+    getLookupTerm(editor?: Editor): string | null {
+        if (!editor) {
+            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (activeView?.getMode() === 'source') {
+                editor = activeView.editor;
+            }
+        }
+
+        const editorSelection = normalizeLookupTerm(editor?.getSelection());
+        if (editorSelection) {
+            return this.captureSelection(editorSelection);
+        }
+
+        const domSelection = normalizeLookupTerm(window.getSelection()?.toString());
+        if (domSelection) {
+            return this.captureSelection(domSelection);
+        }
+
+        if (editor) {
+            const cursor = editor.getCursor();
+            const wordAtCursor = getWordAtOffset(editor.getLine(cursor.line), cursor.ch);
+            if (wordAtCursor) {
+                return this.captureSelection(wordAtCursor);
+            }
+        }
+
+        return this.getCachedSelection();
+    }
+
+    async lookup(value: string): Promise<void> {
+        const term = normalizeLookupTerm(value);
+        if (!term) {
+            new Notice('Select a single word to look up.');
+            return;
+        }
+
+        this.captureSelection(term);
+        const leaf = await this.getDictionaryLeaf();
+        if (!leaf || !(leaf.view instanceof DictionaryView)) {
+            new Notice('Dictionary view could not be opened.');
+            return;
+        }
+
+        leaf.view.query(term);
+        this.app.workspace.revealLeaf(leaf);
+    }
+
+    private getCachedSelection(): string | null {
+        const activePath = this.app.workspace.getActiveFile()?.path ?? null;
+        const isSameFile = this.lastSelectionFilePath === activePath;
+        const isRecent = Date.now() - this.lastSelectionAt < 5 * 60 * 1000;
+        return isSameFile && isRecent ? this.lastSelectedTerm : null;
+    }
+
+    private async getDictionaryLeaf(): Promise<WorkspaceLeaf | null> {
+        let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0] ?? null;
+        if (leaf) return leaf;
+
+        leaf = Platform.isMobile
+            ? this.app.workspace.getLeaf(true)
+            : this.app.workspace.getRightLeaf(false);
+        if (!leaf) {
+            leaf = this.app.workspace.getLeaf(true);
+        }
+
+        await leaf.setViewState({ type: VIEW_TYPE, active: true });
+        return leaf;
+    }
+
+    private isReadingViewEvent(event: MouseEvent): boolean {
+        return event.composedPath().some((node) => {
+            return node instanceof Element && node.classList.contains('markdown-preview-view');
+        });
+    }
+
+    private getWordAtPoint(x: number, y: number): string | null {
+        const documentWithCaret = document as Document & {
+            caretPositionFromPoint?: (x: number, y: number) => CaretPosition | null;
+            caretRangeFromPoint?: (x: number, y: number) => Range | null;
+        };
+        const position = documentWithCaret.caretPositionFromPoint?.(x, y);
+        if (position) {
+            return getWordFromTextNode(position.offsetNode, position.offset);
+        }
+
+        const range = documentWithCaret.caretRangeFromPoint?.(x, y);
+        return range ? getWordFromTextNode(range.startContainer, range.startOffset) : null;
+    }
 
     // Open the synonym popover if a word is selected
     // This is debounced to handle double clicks

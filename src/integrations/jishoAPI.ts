@@ -1,4 +1,5 @@
 import { DefinitionProvider, DictionaryWord } from "src/integrations/types";
+import { requestUrl } from "obsidian";
 
 class Base {
     name = "Jisho";
@@ -40,7 +41,7 @@ export class JishoDefinitionProvider
             console.log(json);
 
             const data = json.data as JishoDefinition[];
-            const word = data.first();
+            const word = data[0];
 
             const definition: DictionaryWord = {
                 word: word.japanese[0].word,

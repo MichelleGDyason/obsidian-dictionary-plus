@@ -3,7 +3,7 @@
   import type { Definition } from "src/integrations/types";
   import { Notice } from "obsidian";
   import { slide } from "svelte/transition";
-  import { copy } from "obsidian-community-lib";
+  import { copyText } from "src/clipboard";
 
   export let word: string;
   export let definitions: Definition[];
@@ -14,20 +14,34 @@
     open = event.detail.open as boolean;
   });
 
-  function wordCopy(word: string) {
-    copy(
-      word,
-      () =>
-        new Notice(
-          t('Copied "{{word}}" to clipboard').replace(/{{word}}/g, word)
-        ),
-      (error) => new Notice(error)
-    );
+  async function wordCopy(word: string) {
+    try {
+      await copyText(word);
+      new Notice(
+        t('Copied "{{word}}" to clipboard').replace(/{{word}}/g, word)
+      );
+    } catch (error) {
+      new Notice(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function activateOnKeyboard(event: KeyboardEvent, action: () => void) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      action();
+    }
   }
 </script>
 
 <div class="main">
-  <div class="opener" class:open on:click={() => (open = !open)}>
+  <div
+    class="opener"
+    class:open
+    role="button"
+    tabindex="0"
+    on:click={() => (open = !open)}
+    on:keydown={(event) => activateOnKeyboard(event, () => (open = !open))}
+  >
     <div class="tree-item-icon collapse-icon" style="">
       <svg viewBox="0 0 100 100" class="right-triangle" width="8" height="8"
         ><path
@@ -60,7 +74,12 @@
               <div class="label">{t("Synonyms:")}</div>
               <p>
                 {#each definition.synonyms as synonym, i}
-                  <span class="synonym" on:click={() => wordCopy(synonym)}
+                  <span
+                    class="synonym"
+                    role="button"
+                    tabindex="0"
+                    on:click={() => wordCopy(synonym)}
+                    on:keydown={(event) => activateOnKeyboard(event, () => wordCopy(synonym))}
                     >{synonym}</span
                   >{#if i < definition.synonyms.length - 1}{", "}{/if}
                 {/each}
@@ -72,7 +91,12 @@
               <div class="label">{t("Antonyms:")}</div>
               <p>
                 {#each definition.antonyms as antonym, i}
-                  <span class="antonym" on:click={() => wordCopy(antonym)}
+                  <span
+                    class="antonym"
+                    role="button"
+                    tabindex="0"
+                    on:click={() => wordCopy(antonym)}
+                    on:keydown={(event) => activateOnKeyboard(event, () => wordCopy(antonym))}
                     >{antonym}</span
                   >{#if i < definition.antonyms.length - 1}{", "}{/if}
                 {/each}

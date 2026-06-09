@@ -17,6 +17,7 @@ import t from 'src/l10n/helpers';
 import LocalDictionaryBuilder from 'src/localDictionaryBuilder';
 import LanguageChooser from 'src/ui/modals/languageChooser';
 import { getWordAtOffset, getWordFromTextNode, normalizeLookupTerm } from './selection';
+import { claimLookupMenu, isRecentContextMenuTerm } from './contextMenu';
 
 export default class DictionaryPlugin extends Plugin {
     declare settings: DictionarySettings;
@@ -27,6 +28,9 @@ export default class DictionaryPlugin extends Plugin {
     private lastSelectedTerm: string | null = null;
     private lastSelectionFilePath: string | null = null;
     private lastSelectionAt = 0;
+    private contextMenuTerm: string | null = null;
+    private contextMenuTermAt = 0;
+    private menusWithLookup = new WeakSet<Menu>();
 
     async onload(): Promise<void> {
         console.log('loading dictionary');
@@ -104,30 +108,36 @@ export default class DictionaryPlugin extends Plugin {
         });
 
         this.registerDomEvent(document.body, "contextmenu", (event) => {
-            if (!this.settings.contextMenuLookup || !this.isReadingViewEvent(event)) {
+            if (!this.settings.contextMenuLookup || !this.isMarkdownContextEvent(event)) {
                 return;
             }
 
-            const selection = window.getSelection()?.toString() ?? "";
+            const eventWindow = event.view ?? window;
+            const selection = eventWindow.getSelection()?.toString() ?? "";
             const term = normalizeLookupTerm(selection)
-                ?? this.getWordAtPoint(event.clientX, event.clientY)
-                ?? this.getCachedSelection();
+                ?? this.getWordAtPoint(event.clientX, event.clientY, eventWindow.document);
 
             if (!term) return;
 
             this.captureSelection(term);
-            const menu = Menu.forEvent(event);
-            menu.addItem((item) => {
-                item.setTitle(`${t('Look up')} "${term}"`)
-                    .setIcon('quote-glyph')
-                    .setSection('dictionary')
-                    .onClick(() => {
-                        void this.lookup(term);
-                    });
-            });
+            this.contextMenuTerm = term;
+            this.contextMenuTermAt = Date.now();
         });
         
         this.registerEvent(this.app.workspace.on('editor-menu', this.handleContextMenuHelper));
+        this.registerEvent(this.app.workspace.on('file-menu', (menu) => {
+            this.addPendingContextMenuLookup(menu);
+        }));
+        this.registerEvent(this.app.workspace.on('url-menu', (menu) => {
+            this.addPendingContextMenuLookup(menu);
+        }));
+        this.registerEvent((this.app.workspace as any).on(
+            'pdf-menu',
+            (menu: Menu, context: { selection?: string }) => {
+                const term = normalizeLookupTerm(context?.selection);
+                if (term) this.addLookupMenuItem(menu, term);
+            }
+        ));
 
         this.registerEvent(this.app.workspace.on('file-open', (file) => {
             if (file && this.settings.getLangFromFile) {
@@ -152,6 +162,27 @@ export default class DictionaryPlugin extends Plugin {
     handleContextMenuHelper = (menu: Menu, editor: Editor, _: MarkdownView): void => {
         handleContextMenu(menu, editor, this);
     };
+
+    addLookupMenuItem(menu: Menu, term: string): void {
+        if (!this.settings.contextMenuLookup || !claimLookupMenu(menu, this.menusWithLookup)) {
+            return;
+        }
+
+        menu.addItem((item) => {
+            item.setTitle(`${t('Look up')} "${term}"`)
+                .setIcon('quote-glyph')
+                .setSection('dictionary')
+                .onClick(() => {
+                    void this.lookup(term);
+                });
+        });
+    }
+
+    private addPendingContextMenuLookup(menu: Menu): void {
+        if (isRecentContextMenuTerm(this.contextMenuTermAt) && this.contextMenuTerm) {
+            this.addLookupMenuItem(menu, this.contextMenuTerm);
+        }
+    }
 
     captureSelection(value: string | null | undefined): string | null {
         const term = normalizeLookupTerm(value);
@@ -232,14 +263,18 @@ export default class DictionaryPlugin extends Plugin {
         return leaf;
     }
 
-    private isReadingViewEvent(event: MouseEvent): boolean {
+    private isMarkdownContextEvent(event: MouseEvent): boolean {
         return event.composedPath().some((node) => {
-            return node instanceof Element && node.classList.contains('markdown-preview-view');
+            const element = node as Element;
+            if (typeof element.matches !== 'function') return false;
+            return element.matches(
+                '.markdown-source-view, .markdown-preview-view, .metadata-container, .metadata-properties'
+            );
         });
     }
 
-    private getWordAtPoint(x: number, y: number): string | null {
-        const documentWithCaret = document as Document & {
+    private getWordAtPoint(x: number, y: number, ownerDocument = document): string | null {
+        const documentWithCaret = ownerDocument as Document & {
             caretPositionFromPoint?: (x: number, y: number) => CaretPosition | null;
             caretRangeFromPoint?: (x: number, y: number) => Range | null;
         };

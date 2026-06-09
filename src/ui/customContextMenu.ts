@@ -18,12 +18,6 @@ export default function handleContextMenu(menu: Menu, instance: Editor, plugin: 
                     });
             });
         }
-        menu.addItem((item) => {
-            item.setTitle(`${t('Look up')} "${selection}"`)
-                .setIcon('quote-glyph')
-                .onClick(() => {
-                    void plugin.lookup(selection);
-                });
-        });
+        plugin.addLookupMenuItem(menu, selection);
     }
 }

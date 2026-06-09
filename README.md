@@ -26,7 +26,7 @@ Open the *Command Palette* (default: `ctrl` + `p`), search for *Open Dictionary 
 - **Desktop:** select a word or place the cursor inside it, then right-click and choose **Look up**.
 - **Mobile:** select a word, then run **Dictionary: Look up selected word** from the command palette. The plugin remembers the selection before the mobile menu collapses it.
 - You can assign a hotkey to **Dictionary: Look up selected word** in Obsidian's Hotkeys settings.
-- Reading view also supports right-click or long-press lookup. **Look up** is added to Obsidian's existing context menu, so normal link, copy, and editing actions remain available. **Show Options in Context Menu** is enabled by default.
+- Reading view links and PDF++ selections support right-click lookup. **Look up** is appended to existing Obsidian and PDF++ menus, so their normal link, copy, annotation, and editing actions remain available. **Show Options in Context Menu** is enabled by default.
 
 Selections are trimmed of surrounding punctuation. Phrases containing spaces are rejected because the configured dictionary providers expect one word.
 

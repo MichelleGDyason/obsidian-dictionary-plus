@@ -122,7 +122,7 @@ export default class SettingsTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName(t('Show Options in Context Menu'))
-            .setDesc('Add Look up to Obsidian right-click menus without replacing the existing link, copy, and editing actions.')
+            .setDesc('Append Look up to supported Obsidian and PDF++ right-click menus without replacing their existing actions.')
             .addToggle(toggle => {
                 toggle.setValue(plugin.settings.contextMenuLookup);
 

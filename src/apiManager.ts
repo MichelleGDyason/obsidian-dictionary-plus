@@ -18,6 +18,7 @@ import { AltervistaSynonymProvider } from "src/integrations/altervistaAPI";
 import type DictionaryPlugin from "src/main";
 import { GoogleScraperDefinitionProvider, GoogleScraperSynonymProvider } from 'src/integrations/googleScraperAPI';
 import { JishoDefinitionProvider } from "src/integrations/jishoAPI";
+import { normalizeLookupTerm } from "./selection";
 
 /*
 HOW TO ADD A NEW API:
@@ -103,6 +104,12 @@ export default class APIManager {
      * @returns The API Response of the chosen API as Promise<Synonym[]>
      */
     public async requestSynonyms(query: string, pos?: PartOfSpeech): Promise<Synonym[]> {
+        const normalizedQuery = normalizeLookupTerm(query);
+        if (!normalizedQuery) {
+            return [];
+        }
+        query = normalizedQuery;
+
         const api = this.getSynonymAPI();
         if (!api) {
             return [];

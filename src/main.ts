@@ -16,7 +16,12 @@ import { addIcons } from 'src/ui/icons';
 import t from 'src/l10n/helpers';
 import LocalDictionaryBuilder from 'src/localDictionaryBuilder';
 import LanguageChooser from 'src/ui/modals/languageChooser';
-import { getWordAtOffset, getWordFromTextNode, normalizeLookupTerm } from './selection';
+import {
+    getWordAtOffset,
+    getWordFromTextNode,
+    normalizeLookupTerm,
+    replaceLookupTermInSelection,
+} from './selection';
 import { claimLookupMenu, isRecentContextMenuTerm } from './contextMenu';
 
 export default class DictionaryPlugin extends Plugin {
@@ -299,13 +304,19 @@ export default class DictionaryPlugin extends Plugin {
 
                 if (view.getMode() === 'source') {
                     const editor = view.editor;
-                    const selection = editor.getSelection();
+                    const rawSelection = editor.getSelection();
+                    const selection = normalizeLookupTerm(rawSelection);
 
                     // Return early if we don't have anything selected, or if
                     // multiple words are selected
-                    if (!selection || /\s/.test(selection)) return;
+                    if (!selection) return;
 
                     const cursor = editor.getCursor('from');
+                    const termOffset = Math.max(0, rawSelection.indexOf(selection));
+                    const termCursor = {
+                        line: cursor.line,
+                        ch: cursor.ch + termOffset,
+                    };
                     const line = editor.getLine(cursor.line);
 
                     let coords: Coords;
@@ -324,11 +335,14 @@ export default class DictionaryPlugin extends Plugin {
                         apiManager: this.manager,
                         advancedPoS: this.settings.advancedSynonymAnalysis,
                         coords,
-                        cursor,
+                        cursor: termCursor,
                         line,
                         selection,
                         onSelect: (replacement) => {
-                            editor.replaceSelection(matchCasing(replacement, selection));
+                            const casedReplacement = matchCasing(replacement, selection);
+                            editor.replaceSelection(
+                                replaceLookupTermInSelection(rawSelection, casedReplacement)
+                            );
                         }
                     });
                 }

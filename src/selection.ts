@@ -1,5 +1,6 @@
 const WORD_CHARACTER = /[\p{L}\p{M}\p{N}'’-]/u;
 const WORD_EDGE = /^[^\p{L}\p{M}\p{N}]+|[^\p{L}\p{M}\p{N}]+$/gu;
+const LOOKUP_TERM = /^[\p{L}\p{M}\p{N}]+(?:['’-][\p{L}\p{M}\p{N}]+)*$/u;
 
 export function normalizeLookupTerm(value: string | null | undefined): string | null {
     if (!value) {
@@ -7,11 +8,27 @@ export function normalizeLookupTerm(value: string | null | undefined): string | 
     }
 
     const normalized = value.trim().replace(WORD_EDGE, "");
-    if (!normalized || /\s/u.test(normalized)) {
+    if (!normalized || !LOOKUP_TERM.test(normalized)) {
         return null;
     }
 
     return normalized;
+}
+
+export function replaceLookupTermInSelection(selection: string, replacement: string): string {
+    const term = normalizeLookupTerm(selection);
+    if (!term) {
+        return selection;
+    }
+
+    const termOffset = selection.indexOf(term);
+    if (termOffset < 0) {
+        return replacement;
+    }
+
+    return selection.slice(0, termOffset)
+        + replacement
+        + selection.slice(termOffset + term.length);
 }
 
 export function getWordAtOffset(text: string, offset: number): string | null {

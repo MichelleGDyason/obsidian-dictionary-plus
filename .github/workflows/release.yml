@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   release:
@@ -29,22 +31,22 @@ jobs:
           npm test
           npm run build
 
-      - name: Package plugin
-        run: |
-          mkdir obsidian-dictionary-plus
-          cp main.js manifest.json styles.css README.md obsidian-dictionary-plus/
-          zip -qr obsidian-dictionary-plus.zip obsidian-dictionary-plus
+      - name: Generate artifact attestations
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            obsidian-dictionary-plus.zip \
             main.js \
             manifest.json \
             styles.css \
-            dictionary.json \
             --verify-tag \
             --title "Dictionary Plus $GITHUB_REF_NAME" \
             --generate-notes

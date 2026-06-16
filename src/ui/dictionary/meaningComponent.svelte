@@ -1,9 +1,7 @@
 <script lang="ts">
   import t from "src/l10n/helpers";
   import type { Definition } from "src/integrations/types";
-  import { Notice } from "obsidian";
   import { slide } from "svelte/transition";
-  import { copyText } from "src/clipboard";
 
   export let word: string;
   export let definitions: Definition[];
@@ -13,17 +11,6 @@
   addEventListener("dictionary-collapse", (event: CustomEvent) => {
     open = event.detail.open as boolean;
   });
-
-  async function wordCopy(word: string) {
-    try {
-      await copyText(word);
-      new Notice(
-        t('Copied "{{word}}" to clipboard').replace(/{{word}}/g, word)
-      );
-    } catch (error) {
-      new Notice(error instanceof Error ? error.message : String(error));
-    }
-  }
 
   function activateOnKeyboard(event: KeyboardEvent, action: () => void) {
     if (event.key === "Enter" || event.key === " ") {
@@ -76,10 +63,6 @@
                 {#each definition.synonyms as synonym, i}
                   <span
                     class="synonym"
-                    role="button"
-                    tabindex="0"
-                    on:click={() => wordCopy(synonym)}
-                    on:keydown={(event) => activateOnKeyboard(event, () => wordCopy(synonym))}
                     >{synonym}</span
                   >{#if i < definition.synonyms.length - 1}{", "}{/if}
                 {/each}
@@ -93,10 +76,6 @@
                 {#each definition.antonyms as antonym, i}
                   <span
                     class="antonym"
-                    role="button"
-                    tabindex="0"
-                    on:click={() => wordCopy(antonym)}
-                    on:keydown={(event) => activateOnKeyboard(event, () => wordCopy(antonym))}
                     >{antonym}</span
                   >{#if i < definition.antonyms.length - 1}{", "}{/if}
                 {/each}

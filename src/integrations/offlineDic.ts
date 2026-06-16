@@ -17,7 +17,7 @@ export class OfflineDictionary implements DefinitionProvider {
     async requestDefinitions(query: string, lang: string): Promise<DictionaryWord> {
         const data = (await this.getOfflineDictionary())[query.toLowerCase()];
         if(!data){
-            return Promise.reject("Word doesnt exist in Offline Dictionary");
+            throw new Error("Word doesnt exist in Offline Dictionary");
         }
         const phonetics: Phonetic[] = [];
         data.readings.forEach(element => {
@@ -49,7 +49,7 @@ export class OfflineDictionary implements DefinitionProvider {
         const path = normalizePath(`${plugin.manifest.dir}/offlineDictionary.json`);
         if (!this.offlineDic) {
             if (!await adapter.exists(path)) {
-                const data = await request({ url: `https://github.com/MichelleGDyason/obsidian-dictionary-plus/releases/download/${plugin.manifest.version}/dictionary.json` });
+                const data = await request({ url: `https://raw.githubusercontent.com/MichelleGDyason/obsidian-dictionary-plus/${plugin.manifest.version}/dictionary.json` });
                 await adapter.write(path, data);
             }
             this.offlineDic = JSON.parse(await adapter.read(path));

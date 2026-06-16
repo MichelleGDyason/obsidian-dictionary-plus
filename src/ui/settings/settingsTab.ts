@@ -18,7 +18,9 @@ export default class SettingsTab extends PluginSettingTab {
 
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: t('Dictionary Settings') });
+        new Setting(containerEl)
+            .setName(t('Dictionary Settings'))
+            .setHeading();
 
         new Setting(containerEl)
             .setName(t('Language'))
@@ -96,7 +98,7 @@ export default class SettingsTab extends PluginSettingTab {
             });
 
         if (plugin.manager.partOfSpeechProvider.length) {
-            const desc = document.createDocumentFragment();
+            const desc = activeDocument.createDocumentFragment();
             desc.append(
                 t('Enabling this will allow the Plugin to analyze full sentences to better suggest synonyms based on the context.'),
                 desc.createEl("br"),
@@ -131,7 +133,9 @@ export default class SettingsTab extends PluginSettingTab {
                     await this.save();
                 })
             });
-        containerEl.createEl('h3', { text: t("Local-Dictionary-Builder Settings") });
+        new Setting(containerEl)
+            .setName(t("Local-Dictionary-Builder Settings"))
+            .setHeading();
         new Setting(containerEl)
             .setName(t('Local Dictionary Folder'))
             .setDesc('Specify where full dictionary notes are created. Parent folders are created automatically.')
@@ -203,7 +207,7 @@ export default class SettingsTab extends PluginSettingTab {
                     plugin.settings.suffix = value;
                     await this.save();
                 }));
-        const templateDescription = document.createDocumentFragment();
+        const templateDescription = activeDocument.createDocumentFragment();
         templateDescription.append(
             t('Here you can edit the Template for newly created Files.'),
             templateDescription.createEl("br"),
@@ -233,7 +237,9 @@ export default class SettingsTab extends PluginSettingTab {
                     });
             });
 
-        containerEl.createEl('h3', { text: t("Caching Settings") });
+        new Setting(containerEl)
+            .setName(t("Caching Settings"))
+            .setHeading();
         new Setting(containerEl)
             .setName(t("Use Caching"))
             .setDesc(t("Enable or disable caching. Caching provides a semi-offline experience by saving every result for later use."))
@@ -244,10 +250,10 @@ export default class SettingsTab extends PluginSettingTab {
                     await this.save();
                 })
             });
-        const cachingInfo = document.createDocumentFragment();
+        const cachingInfo = activeDocument.createDocumentFragment();
         cachingInfo.append(
             t('Here you can delete all cached Data.'),
-            templateDescription.createEl("br"),
+            cachingInfo.createEl("br"),
             t("You currently have "),
             plugin.cache.cachedDefinitions.length.toString(),
             t(" cached Definitions and "),
@@ -269,7 +275,9 @@ export default class SettingsTab extends PluginSettingTab {
                 });
             });
 
-        containerEl.createEl('h3', { text: t("Miscellaneous") });
+        new Setting(containerEl)
+            .setName(t("Miscellaneous"))
+            .setHeading();
         new Setting(containerEl)
             .setName(t('More Information'))
             .setDesc(t('View Information about the API\'s and the Plugin itself.'))
@@ -280,13 +288,21 @@ export default class SettingsTab extends PluginSettingTab {
                     new InfoModal(plugin).open();
                 });
             });
+        const donateDescription = activeDocument.createDocumentFragment();
+        donateDescription.appendText(t('If you like this Plugin, consider donating to support continued development:'));
+        donateDescription.createEl('br');
+        const donateLink = donateDescription.createEl('a', {
+            href: 'https://ko-fi.com/phibr0',
+        });
+        donateLink.createEl('img', {
+            attr: {
+                alt: 'Support on Ko-fi',
+                src: 'https://uploads-ssl.webflow.com/5c14e387dab576fe667689cf/61e11e22d8ff4a5b4a1b3346_Supportbutton-1.png',
+            },
+        });
         new Setting(containerEl)
             .setName(t('Donate'))
-            .setDesc(t('If you like this Plugin, consider donating to support continued development:'))
-            .setClass("extra")
-            .addButton((bt) => {
-                bt.buttonEl.outerHTML = `<a href="https://ko-fi.com/phibr0"><img src="https://uploads-ssl.webflow.com/5c14e387dab576fe667689cf/61e11e22d8ff4a5b4a1b3346_Supportbutton-1.png"></a>`;
-            });
+            .setDesc(donateDescription);
     }
 
     private async save() {
@@ -304,7 +320,7 @@ class InfoModal extends Modal {
     }
 
     onOpen() {
-        this.contentEl.parentElement.style.padding = "10px 12px";
+        this.modalEl.addClass("dictionary-info-modal");
         this._view = new InfoModalComponent({
             target: this.contentEl,
             props: {

@@ -5,7 +5,7 @@ import type { DictionarySettings } from "src/types";
 
 import t from "src/l10n/helpers";
 import { MarkdownView, Modal, normalizePath, Notice, TFile } from "obsidian";
-import { buildFlashcardEntry } from "./flashcards";
+import { buildFlashcardEntry, upsertFlashcardEntry } from "./flashcards";
 
 //This really needs a refactor
 
@@ -141,10 +141,8 @@ export default class LocalDictionaryBuilder {
             }
 
             const current = await this.plugin.app.vault.read(existing);
-            if (!current.includes(entry.marker)) {
-                const separator = current.endsWith('\n') ? '\n' : '\n\n';
-                await this.plugin.app.vault.modify(existing, `${current}${separator}${entry.markdown}`);
-            }
+            const next = upsertFlashcardEntry(current, entry);
+            if (next !== current) await this.plugin.app.vault.modify(existing, next);
         } catch (error) {
             console.error('Failed to save dictionary lookup history', error);
             new Notice(`Could not save dictionary lookup history: ${this.errorMessage(error)}`);
@@ -221,11 +219,18 @@ class OverwriteModal extends Modal {
         this.contentEl.appendChild(createEl("p", { text: t("A existing File with the same Name was found, do you want to overwrite it?"), cls: "dictionarycenter" }));
         const buttonDiv = this.contentEl.appendChild(createDiv({ cls: "dictionarybuttons" }))
         buttonDiv.appendChild(createEl("button", { text: t("Yes, overwrite the old File."), cls: "mod-cta" })).onClickEvent(async () => {
-            this.app.vault.modify(this.app.vault.getAbstractFileByPath(this.path) as TFile, this.content);
+            const existingFile = this.app.vault.getAbstractFileByPath(this.path);
+            if (!(existingFile instanceof TFile)) {
+                new Notice(`Could not overwrite ${this.path}`);
+                return;
+            }
+
+            await this.app.vault.modify(existingFile, this.content);
             let oldPaneOpen = false;
             this.app.workspace.iterateAllLeaves((leaf) => {
                 if (leaf.view instanceof MarkdownView) {
-                    if ((leaf.getViewState().state.file as string).endsWith(this.path)) {
+                    const state = leaf.getViewState().state;
+                    if (typeof state.file === 'string' && state.file.endsWith(this.path)) {
                         oldPaneOpen = true;
                         this.app.workspace.setActiveLeaf(leaf);
                     }
@@ -233,7 +238,7 @@ class OverwriteModal extends Modal {
             });
             if (!oldPaneOpen && this.openNote) {
                 const leaf = this.app.workspace.getLeaf(true);
-                await leaf.openFile(this.app.vault.getAbstractFileByPath(this.path) as TFile);
+                await leaf.openFile(existingFile);
                 this.app.workspace.setActiveLeaf(leaf);
             }
             this.close();

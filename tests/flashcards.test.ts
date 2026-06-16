@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildFlashcardEntry } from "../src/flashcards.ts";
+import { buildFlashcardEntry, upsertFlashcardEntry } from "../src/flashcards.ts";
 
-test("builds a Spaced Repetition single-line card from the first definition", () => {
+test("builds a Spaced Repetition single-line card from every definition", () => {
     const result = buildFlashcardEntry({
         word: "Dictionary",
         phonetics: [],
@@ -11,13 +11,20 @@ test("builds a Spaced Repetition single-line card from the first definition", ()
             partOfSpeech: "noun",
             definitions: [{
                 definition: "A reference work\nthat explains words.",
+            }, {
+                definition: "A list of words used by a program.",
+            }],
+        }, {
+            partOfSpeech: "verb",
+            definitions: [{
+                definition: "To add something to a dictionary.",
             }],
         }],
     }, "en-US");
 
     assert.deepEqual(result, {
         marker: "<!-- obsidian-dictionary:en-US:dictionary -->",
-        markdown: "Dictionary::noun: A reference work that explains words.\n<!-- obsidian-dictionary:en-US:dictionary -->\n\n",
+        markdown: "Dictionary::noun: A reference work that explains words. | noun: A list of words used by a program. | verb: To add something to a dictionary.\n<!-- obsidian-dictionary:en-US:dictionary -->\n\n",
     });
 });
 
@@ -43,4 +50,35 @@ test("returns null when no usable definition exists", () => {
         phonetics: [],
         meanings: [],
     }, "en-US"), null);
+});
+
+test("replaces an existing lookup history block for the same word", () => {
+    const entry = buildFlashcardEntry({
+        word: "Test",
+        phonetics: [],
+        meanings: [{
+            partOfSpeech: "noun",
+            definitions: [{
+                definition: "A complete definition.",
+            }, {
+                definition: "Another definition.",
+            }],
+        }],
+    }, "en-US");
+
+    assert.ok(entry);
+    const current = [
+        "# Dictionary lookup flashcards",
+        "",
+        "#flashcards",
+        "",
+        "Test::old definition",
+        "<!-- obsidian-dictionary:en-US:test -->",
+        "",
+    ].join("\n");
+
+    assert.equal(
+        upsertFlashcardEntry(current, entry),
+        "# Dictionary lookup flashcards\n\n#flashcards\n\nTest::noun: A complete definition. | noun: Another definition.\n<!-- obsidian-dictionary:en-US:test -->\n\n"
+    );
 });

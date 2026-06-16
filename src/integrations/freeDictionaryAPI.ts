@@ -1,5 +1,6 @@
 import { request } from 'obsidian';
 import { DefinitionProvider, DictionaryWord, Meaning, PartOfSpeech, Synonym, SynonymProvider } from "src/integrations/types";
+import { isNotFoundRequestError } from "src/requestErrors";
 
 abstract class Base {
     API_END_POINT = "https://api.dictionaryapi.dev/api/v2/entries/";
@@ -71,7 +72,7 @@ export class FreeDictionaryDefinitionProvider extends Base implements Definition
         const json = (await JSON.parse(result) as DictionaryWord[]);
 
         if(!json || json["title"]){
-            return Promise.reject(json["title"]);
+            throw new Error(json["title"] ?? "Word doesnt exist in this Dictionary");
         }
 
         return json[0];
@@ -112,13 +113,17 @@ export class FreeDictionarySynonymProvider extends Base implements SynonymProvid
     async requestSynonyms(query: string, lang: string, pos?: PartOfSpeech): Promise<Synonym[]> {
         let result: string;
         try {
-            result = await request({url: this.constructRequest(query, this.languageCodes[lang])});
+            const url = this.constructRequest(encodeURIComponent(query), this.languageCodes[lang]);
+            result = await request({url});
         } catch (error) {
+            if (isNotFoundRequestError(error)) {
+                return [];
+            }
             return Promise.reject(error);
         }
         
         if(!result){
-            return Promise.reject("Word doesnt exist in this Dictionary");
+            throw new Error("Word doesnt exist in this Dictionary");
         }
 
         const meanings: Meaning[] = (await JSON.parse(result) as DictionaryWord[])[0].meanings;

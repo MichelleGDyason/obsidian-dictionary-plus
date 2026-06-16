@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { DictionaryCache, DictionarySettings } from 'src/types';
 import type { APISettings } from './types';
+import type { EventRef } from 'obsidian';
 
 import { debounce, Editor, MarkdownView, Menu, normalizePath, Notice, Platform, Plugin, WorkspaceLeaf } from 'obsidian';
 import { matchCasing } from "match-casing";
@@ -23,6 +22,39 @@ import {
     replaceLookupTermInSelection,
 } from './selection';
 import { claimLookupMenu, isRecentContextMenuTerm } from './contextMenu';
+
+interface PdfMenuContext {
+    selection?: string;
+}
+
+declare module 'obsidian' {
+    interface Workspace {
+        on(name: 'pdf-menu', callback: (menu: Menu, context: PdfMenuContext) => unknown): EventRef;
+    }
+}
+
+interface CursorCoordsEditor extends Editor {
+    cursorCoords(where: boolean, mode: 'window'): Coords;
+}
+
+interface CoordsAtPosEditor extends Editor {
+    coordsAtPos(offset: number): Coords | null;
+    cm?: {
+        coordsAtPos?(offset: number): Coords | null;
+    };
+}
+
+function hasCursorCoords(editor: Editor): editor is CursorCoordsEditor {
+    return typeof (editor as Partial<CursorCoordsEditor>).cursorCoords === 'function';
+}
+
+function hasCoordsAtPos(editor: Editor): editor is CoordsAtPosEditor {
+    return typeof (editor as Partial<CoordsAtPosEditor>).coordsAtPos === 'function';
+}
+
+function hasNodeDocument(target: EventTarget | null): target is EventTarget & { doc: Document } {
+    return Boolean(target && 'doc' in target);
+}
 
 export default class DictionaryPlugin extends Plugin {
     declare settings: DictionarySettings;
@@ -59,7 +91,7 @@ export default class DictionaryPlugin extends Plugin {
             callback: async () => {
                 const leaf = await this.getDictionaryLeaf();
                 if (!leaf) return;
-                this.app.workspace.revealLeaf(leaf);
+                await this.app.workspace.revealLeaf(leaf);
                 if (leaf.view instanceof DictionaryView) {
                     leaf.view.focusSearch();
                 }
@@ -93,18 +125,25 @@ export default class DictionaryPlugin extends Plugin {
             },
         });
 
-        this.registerDomEvent(document, "selectionchange", () => {
-            this.captureSelection(window.getSelection()?.toString());
+        const ownerDocument = activeDocument;
+        const ownerWindow = ownerDocument.defaultView ?? activeWindow;
+
+        this.registerDomEvent(ownerDocument, "selectionchange", () => {
+            this.captureSelection(ownerWindow.getSelection()?.toString());
         });
 
-        this.registerDomEvent(document.body, "pointerup", () => {
-            this.captureSelection(window.getSelection()?.toString());
+        this.registerDomEvent(ownerDocument.body, "pointerup", (event) => {
+            this.captureSelection(ownerWindow.getSelection()?.toString());
+            const target = event.target;
+            if (!(target instanceof Element) || !target.closest(".markdown-source-view")) {
+                return;
+            }
             if (!this.settings.shouldShowSynonymPopover || !this.manager.hasSynonymProvider()) {
                 return;
             }
             this.handlePointerUp();
         });
-        this.registerDomEvent(window, "keydown", () => {
+        this.registerDomEvent(ownerWindow, "keydown", () => {
             // Destroy the popover if it's open
             if (this.synonymPopover) {
                 this.synonymPopover.destroy();
@@ -112,15 +151,16 @@ export default class DictionaryPlugin extends Plugin {
             }
         });
 
-        this.registerDomEvent(document.body, "contextmenu", (event) => {
+        this.registerDomEvent(ownerDocument.body, "contextmenu", (event) => {
             if (!this.settings.contextMenuLookup || !this.isMarkdownContextEvent(event)) {
                 return;
             }
 
-            const eventWindow = event.view ?? window;
+            const eventDocument = hasNodeDocument(event.target) ? event.target.doc : ownerDocument;
+            const eventWindow = eventDocument.defaultView ?? ownerWindow;
             const selection = eventWindow.getSelection()?.toString() ?? "";
             const term = normalizeLookupTerm(selection)
-                ?? this.getWordAtPoint(event.clientX, event.clientY, eventWindow.document);
+                ?? this.getWordAtPoint(event.clientX, event.clientY, eventDocument);
 
             if (!term) return;
 
@@ -136,9 +176,9 @@ export default class DictionaryPlugin extends Plugin {
         this.registerEvent(this.app.workspace.on('url-menu', (menu) => {
             this.addPendingContextMenuLookup(menu);
         }));
-        this.registerEvent((this.app.workspace as any).on(
+        this.registerEvent(this.app.workspace.on(
             'pdf-menu',
-            (menu: Menu, context: { selection?: string }) => {
+            (menu, context) => {
                 const term = normalizeLookupTerm(context?.selection);
                 if (term) this.addLookupMenuItem(menu, term);
             }
@@ -155,7 +195,7 @@ export default class DictionaryPlugin extends Plugin {
                 } else {
                     this.settings.defaultLanguage = this.settings.normalLang;
                 }
-                this.saveSettings();
+                void this.saveSettings();
             }
         }));
     }
@@ -212,7 +252,7 @@ export default class DictionaryPlugin extends Plugin {
             return this.captureSelection(editorSelection);
         }
 
-        const domSelection = normalizeLookupTerm(window.getSelection()?.toString());
+        const domSelection = normalizeLookupTerm(activeWindow.getSelection()?.toString());
         if (domSelection) {
             return this.captureSelection(domSelection);
         }
@@ -243,7 +283,7 @@ export default class DictionaryPlugin extends Plugin {
         }
 
         leaf.view.query(term);
-        this.app.workspace.revealLeaf(leaf);
+        await this.app.workspace.revealLeaf(leaf);
     }
 
     private getCachedSelection(): string | null {
@@ -278,9 +318,12 @@ export default class DictionaryPlugin extends Plugin {
         });
     }
 
-    private getWordAtPoint(x: number, y: number, ownerDocument = document): string | null {
+    private getWordAtPoint(x: number, y: number, ownerDocument = activeDocument): string | null {
         const documentWithCaret = ownerDocument as Document & {
-            caretPositionFromPoint?: (x: number, y: number) => CaretPosition | null;
+            caretPositionFromPoint?: (x: number, y: number) => {
+                offsetNode: Node;
+                offset: number;
+            } | null;
             caretRangeFromPoint?: (x: number, y: number) => Range | null;
         };
         const position = documentWithCaret.caretPositionFromPoint?.(x, y);
@@ -297,11 +340,9 @@ export default class DictionaryPlugin extends Plugin {
     handlePointerUp = debounce(
         () => {
 
-            const activeLeaf = this.app.workspace.activeLeaf;
+            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 
-            if (activeLeaf?.view instanceof MarkdownView) {
-                const view = activeLeaf.view;
-
+            if (view) {
                 if (view.getMode() === 'source') {
                     const editor = view.editor;
                     const rawSelection = editor.getSelection();
@@ -322,11 +363,12 @@ export default class DictionaryPlugin extends Plugin {
                     let coords: Coords;
 
                     // Get the cursor position using the appropriate CM5 or CM6 interface
-                    if ((editor as any).cursorCoords) {
-                        coords = (editor as any).cursorCoords(true, 'window');
-                    } else if ((editor as any).coordsAtPos) {
+                    if (hasCursorCoords(editor)) {
+                        coords = editor.cursorCoords(true, 'window');
+                    } else if (hasCoordsAtPos(editor)) {
                         const offset = editor.posToOffset(cursor);
-                        coords = (editor as any).cm.coordsAtPos?.(offset) ?? (editor as any).coordsAtPos(offset);
+                        coords = editor.cm?.coordsAtPos?.(offset) ?? editor.coordsAtPos(offset);
+                        if (!coords) return;
                     } else {
                         return;
                     }

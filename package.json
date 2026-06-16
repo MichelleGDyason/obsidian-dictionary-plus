@@ -1,6 +1,6 @@
 {
   "name": "dictionary-plus",
-  "version": "3.0.5",
+  "version": "3.0.6",
   "description": "Dictionary lookup, mobile selection support, and flashcard-ready lookup history for Obsidian.",
   "private": true,
   "main": "main.js",
@@ -8,6 +8,7 @@
     "dev": "node esbuild.config.mjs",
     "build": "node esbuild.config.mjs production",
     "check": "svelte-check --tsconfig ./tsconfig.json",
+    "lint:obsidian": "eslint src/**/*.ts",
     "test": "node --experimental-strip-types --test tests/*.test.ts"
   },
   "keywords": [
@@ -23,6 +24,7 @@
     "@types/node": "^22.15.0",
     "esbuild": "^0.28.0",
     "esbuild-svelte": "^0.9.5",
+    "eslint-plugin-obsidianmd": "^0.3.0",
     "sass": "^1.100.0",
     "svelte": "^4.2.20",
     "svelte-check": "^3.8.6",

@@ -12,24 +12,26 @@
     // Reposition the popover to fit on screen, if needed
     const height = node.clientHeight;
     const width = node.clientWidth;
+    const ownerDocument = node.doc;
+    const ownerWindow = node.win;
 
-    if (coords.bottom + height > window.innerHeight) {
+    if (coords.bottom + height > ownerWindow.innerHeight) {
       node.style.setProperty("top", `${coords.top - height}px`);
     }
 
-    if (coords.left + width > window.innerWidth) {
-      node.style.setProperty("left", `${window.innerWidth - width - 15}px`);
+    if (coords.left + width > ownerWindow.innerWidth) {
+      node.style.setProperty("left", `${ownerWindow.innerWidth - width - 15}px`);
     }
     
     // Fire onClickOutside if anything but the popover is clicked
     function onBodyPointerUp(e: MouseEvent) {
       if (!node.contains(e.target as Node)) {
-        document.body.removeEventListener("pointerup", onBodyPointerUp);
+        ownerDocument.body.removeEventListener("pointerup", onBodyPointerUp);
         onClickOutside();
       }
     }
 
-    document.body.addEventListener("pointerup", onBodyPointerUp);
+    ownerDocument.body.addEventListener("pointerup", onBodyPointerUp);
   }
 
   function selectOnKeyboard(event: KeyboardEvent, word: string) {

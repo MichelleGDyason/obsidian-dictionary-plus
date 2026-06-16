@@ -49,7 +49,7 @@ export const DEFAULT_SETTINGS: DictionarySettings = {
     getLangFromFile: true,
     defaultLanguage: "en_US",
     normalLang: 'en_US',
-    shouldShowSynonymPopover: true,
+    shouldShowSynonymPopover: false,
     contextMenuLookup: true,
     apiSettings: {
         en_US: {

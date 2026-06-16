@@ -31,6 +31,10 @@ a[href="https://ko-fi.com/phibr0"]
   place-content: center;
 }
 
-.dictionary-view-content {
-  overflow-y: hidden !important;
+.workspace-leaf-content[data-type="dictionary-view"] .dictionary-view-content {
+  overflow-y: hidden;
+}
+
+.dictionary-info-modal {
+  padding: 10px 12px;
 }

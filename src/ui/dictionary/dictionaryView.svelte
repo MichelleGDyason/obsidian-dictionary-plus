@@ -18,6 +18,7 @@
   let lastQuery: string = null;
   let promise: Promise<DictionaryWord>;
   let buttons: HTMLElement[] = [];
+  let searchInput: HTMLInputElement;
 
   onMount(() => {
     const iconTimer = window.setTimeout(() => {
@@ -88,7 +89,7 @@
     query = "";
     lastQuery = null;
     promise = null;
-    document.querySelector<HTMLInputElement>("#dictionary-search-input")?.focus();
+    searchInput?.focus();
   }
 
   export function searchFor(value: string) {
@@ -97,7 +98,7 @@
   }
 
   export function focusSearch() {
-    document.querySelector<HTMLInputElement>("#dictionary-search-input")?.focus();
+    searchInput?.focus();
   }
 
   async function generateNote(event: MouseEvent | KeyboardEvent) {
@@ -170,6 +171,7 @@
     type="text"
     spellcheck="true"
     placeholder={t("Enter a word")}
+    bind:this={searchInput}
     bind:value={query}
     on:keydown={handleKeyDown}
     on:keydown={debouncedSearch}

@@ -26,7 +26,7 @@ export class SynonymPopover {
 
     constructor(settings: SynonymProviderSettings) {
         this.settings = settings;
-        this.openSynonymPopover();
+        void this.openSynonymPopover();
     }
 
     destroy(): void {
@@ -82,7 +82,7 @@ export class SynonymPopover {
                 // Open the synonym popover
                 this._view = new SynonymPopoverComponent({
                     intro: true,
-                    target: document.body,
+                    target: activeDocument.body,
                     props: {
                         coords,
                         synonyms,

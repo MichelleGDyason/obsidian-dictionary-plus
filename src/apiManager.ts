@@ -76,23 +76,23 @@ export default class APIManager {
             const cachedDefinition = cache.cachedDefinitions.find((c) => { return c.content.word.toLowerCase() == query.toLowerCase() && c.lang == settings.defaultLanguage && c.api == api.name });
             //If cachedDefiniton exists return it as a Promise
             if (cachedDefinition) {
-                return new Promise((resolve) => resolve(cachedDefinition.content));
+                await this.plugin.localDictionary.recordLookup(cachedDefinition.content);
+                return cachedDefinition.content;
             } else {
                 //If it doesnt exist request a new Definition
-                const result = api.requestDefinitions(query, settings.defaultLanguage);
-
-                //If the word gets found by the API cache it for later use
-                const awaitedResult = await result;
+                const awaitedResult = await api.requestDefinitions(query, settings.defaultLanguage);
                 if (awaitedResult) {
                     cache.cachedDefinitions.push({ content: awaitedResult, api: api.name, lang: settings.defaultLanguage });
                     await this.plugin.saveCache();
+                    await this.plugin.localDictionary.recordLookup(awaitedResult);
                 }
 
-                //finally return the Promise so it can be awaited by the UI
-                return result;
+                return awaitedResult;
             }
         } else {
-            return api.requestDefinitions(query, this.plugin.settings.defaultLanguage);
+            const result = await api.requestDefinitions(query, this.plugin.settings.defaultLanguage);
+            await this.plugin.localDictionary.recordLookup(result);
+            return result;
         }
     }
 

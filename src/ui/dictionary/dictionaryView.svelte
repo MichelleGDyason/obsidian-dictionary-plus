@@ -44,13 +44,6 @@
         matchCase ? query : query.toLowerCase()
       );
       promise = currentRequest;
-      currentRequest
-        .then((result) => {
-          if (promise === currentRequest) {
-            return localDictionary.recordLookup(result);
-          }
-        })
-        .catch(() => undefined);
     }
   }
 

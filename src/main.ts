@@ -223,6 +223,19 @@ export default class DictionaryPlugin extends Plugin {
         });
     }
 
+    showLookupMenuAtMouseEvent(event: MouseEvent, term: string): boolean {
+        const normalizedTerm = normalizeLookupTerm(term);
+        if (!normalizedTerm || !this.settings.contextMenuLookup) {
+            return false;
+        }
+
+        const menu = new Menu();
+        this.addLookupMenuItem(menu, normalizedTerm);
+        event.preventDefault();
+        menu.showAtMouseEvent(event);
+        return true;
+    }
+
     private addPendingContextMenuLookup(menu: Menu): void {
         if (isRecentContextMenuTerm(this.contextMenuTermAt) && this.contextMenuTerm) {
             this.addLookupMenuItem(menu, this.contextMenuTerm);

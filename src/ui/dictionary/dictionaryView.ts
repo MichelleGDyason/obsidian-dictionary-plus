@@ -5,6 +5,7 @@ import { VIEW_TYPE, VIEW_DISPLAY_TEXT, VIEW_ICON } from "src/_constants";
 import DictionaryComponent from "./dictionaryView.svelte";
 import LanguageChooser from "src/ui/modals/languageChooser";
 import DefinitionProviderChooser from "src/ui/modals/definitionProviderChooser";
+import { getWordFromTextNode, normalizeLookupTerm } from "src/selection";
 
 export default class DictionaryView extends ItemView {
 
@@ -55,6 +56,18 @@ export default class DictionaryView extends ItemView {
             }
         });
         this.contentEl.addClass("dictionary-view-content");
+        this.registerDomEvent(this.contentEl, "contextmenu", (event) => {
+            const target = event.target;
+            if (!(target instanceof Element) || !target.closest(".contents")) {
+                return;
+            }
+
+            const term = this.getSelectedTerm()
+                ?? this.getWordAtPoint(event);
+            if (term) {
+                this.plugin.showLookupMenuAtMouseEvent(event, term);
+            }
+        });
         if (this.pendingQuery) {
             this._view.searchFor(this.pendingQuery);
             this.pendingQuery = null;
@@ -66,6 +79,48 @@ export default class DictionaryView extends ItemView {
             new DefinitionProviderChooser(this.app, this.plugin).open();
         });
         return super.onOpen();
+    }
+
+    private getSelectedTerm(): string | null {
+        const selection = this.contentEl.ownerDocument.getSelection();
+        if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+            return null;
+        }
+
+        const anchorNode = selection.anchorNode;
+        const focusNode = selection.focusNode;
+        if (!this.containsNode(anchorNode) || !this.containsNode(focusNode)) {
+            return null;
+        }
+
+        return normalizeLookupTerm(selection.toString());
+    }
+
+    private getWordAtPoint(event: MouseEvent): string | null {
+        const ownerDocument = event.view?.document ?? activeDocument;
+        const documentWithCaret = ownerDocument as Document & {
+            caretPositionFromPoint?: (x: number, y: number) => {
+                offsetNode: Node;
+                offset: number;
+            } | null;
+            caretRangeFromPoint?: (x: number, y: number) => Range | null;
+        };
+
+        const position = documentWithCaret.caretPositionFromPoint?.(event.clientX, event.clientY);
+        if (position) {
+            return getWordFromTextNode(position.offsetNode, position.offset);
+        }
+
+        const range = documentWithCaret.caretRangeFromPoint?.(event.clientX, event.clientY);
+        return range ? getWordFromTextNode(range.startContainer, range.startOffset) : null;
+    }
+
+    private containsNode(node: Node | null): boolean {
+        if (!node) return false;
+        const element = node.nodeType === Node.ELEMENT_NODE
+            ? node
+            : node.parentElement;
+        return Boolean(element && this.contentEl.contains(element));
     }
 
 }

@@ -1,6 +1,6 @@
 {
   "name": "dictionary-plus",
-  "version": "3.0.8",
+  "version": "3.0.9",
   "description": "Dictionary lookup, mobile selection support, and flashcard-ready lookup history for Obsidian.",
   "private": true,
   "main": "main.js",

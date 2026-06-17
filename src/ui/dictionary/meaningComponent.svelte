@@ -1,12 +1,15 @@
 <script lang="ts">
   import t from "src/l10n/helpers";
   import type { Definition } from "src/integrations/types";
+  import { normalizeLookupTerm } from "src/selection";
+  import { createEventDispatcher } from "svelte";
   import { slide } from "svelte/transition";
 
   export let word: string;
   export let definitions: Definition[];
   export let partOfSpeech: string;
   let open = false;
+  const dispatch = createEventDispatcher<{ lookupTerm: string }>();
 
   addEventListener("dictionary-collapse", (event: CustomEvent) => {
     open = event.detail.open as boolean;
@@ -16,6 +19,13 @@
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       action();
+    }
+  }
+
+  function lookupTerm(term: string) {
+    const normalized = normalizeLookupTerm(term);
+    if (normalized) {
+      dispatch("lookupTerm", normalized);
     }
   }
 </script>
@@ -56,20 +66,28 @@
               )}
             </blockquote>
           {/if}
-          {#if definition.synonyms && definition.synonyms[i]}
+          {#if definition.synonyms?.length}
             <div class="synonyms">
               <div class="label">{t("Synonyms:")}</div>
               <p>
                 {#each definition.synonyms as synonym, i}
-                  <span
-                    class="synonym"
-                    >{synonym}</span
-                  >{#if i < definition.synonyms.length - 1}{", "}{/if}
+                  {#if normalizeLookupTerm(synonym)}
+                    <button
+                      type="button"
+                      class="lookup-term-button synonym"
+                      title={`${t("Look up")} "${synonym}"`}
+                      on:click={() => lookupTerm(synonym)}
+                    >
+                      {synonym}
+                    </button>
+                  {:else}
+                    <span class="synonym">{synonym}</span>
+                  {/if}{#if i < definition.synonyms.length - 1}{", "}{/if}
                 {/each}
               </p>
             </div>
           {/if}
-          {#if definition.antonyms && definition.antonyms[i]}
+          {#if definition.antonyms?.length}
             <div class="antonyms">
               <div class="label">{t("Antonyms:")}</div>
               <p>
@@ -111,6 +129,25 @@
     &:hover {
       color: var(--interactive-accent);
       border-radius: 2px;
+    }
+  }
+
+  .lookup-term-button {
+    background: none;
+    border: 0;
+    color: var(--text-normal);
+    cursor: pointer;
+    font: inherit;
+    margin: 0;
+    padding: 0;
+    text-decoration: underline;
+    text-decoration-color: var(--text-faint);
+    text-underline-offset: 0.15em;
+
+    &:hover,
+    &:focus-visible {
+      color: var(--interactive-accent);
+      text-decoration-color: var(--interactive-accent);
     }
   }
 

@@ -91,6 +91,7 @@ export default {
     'Pronunciation': 'Pronunciation',
     'Meanings': 'Meanings',
     "Origin": "Origin",
+    "Etymology": "Etymology",
     'New Note': 'New Note',
     "View Error": "View Error",
     "Match Case": "Match Case",

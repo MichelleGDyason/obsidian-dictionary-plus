@@ -1,6 +1,6 @@
 <script lang="ts">
   import type APIManager from "src/apiManager";
-  import type { DictionaryWord } from "src/integrations/types";
+  import type { DictionaryWord, Synonym } from "src/integrations/types";
   import type LocalDictionaryBuilder from "src/localDictionaryBuilder";
 
   import PhoneticComponent from "./phoneticComponent.svelte";
@@ -8,6 +8,7 @@
   import ErrorComponent from "./errorComponent.svelte";
   import OriginComponent from "./originComponent.svelte";
   import t from "src/l10n/helpers";
+  import { normalizeLookupTerm } from "src/selection";
   import { debounce, setIcon } from "obsidian";
   import { onMount } from "svelte";
 
@@ -17,6 +18,7 @@
   export let query: string = "";
   let lastQuery: string = null;
   let promise: Promise<DictionaryWord>;
+  let synonymPromise: Promise<Synonym[]>;
   let buttons: HTMLElement[] = [];
   let searchInput: HTMLInputElement;
 
@@ -44,6 +46,12 @@
         matchCase ? query : query.toLowerCase()
       );
       promise = currentRequest;
+      synonymPromise = currentRequest
+        .then(async (data) => buildLookupSynonyms(
+          await manager.requestSynonyms(data.word),
+          data.word
+        ))
+        .catch(() => []);
     }
   }
 
@@ -82,6 +90,7 @@
     query = "";
     lastQuery = null;
     promise = null;
+    synonymPromise = null;
     searchInput?.focus();
   }
 
@@ -101,6 +110,28 @@
         event.ctrlKey ? false : true
       );
     }
+  }
+
+  function buildLookupSynonyms(synonyms: Synonym[], sourceWord: string): Synonym[] {
+    const seen = new Set<string>();
+    const source = normalizeLookupTerm(sourceWord)?.toLocaleLowerCase();
+
+    return (synonyms ?? []).flatMap((synonym) => {
+      const term = normalizeLookupTerm(synonym.word);
+      if (!term) return [];
+
+      const key = term.toLocaleLowerCase();
+      if (key === source || seen.has(key)) return [];
+
+      seen.add(key);
+      return [{ ...synonym, word: term }];
+    });
+  }
+
+  function lookupTerm(term: string) {
+    const normalized = normalizeLookupTerm(term);
+    if (!normalized) return;
+    searchFor(normalized);
   }
 </script>
 
@@ -199,12 +230,40 @@
         <div class="container">
           <h3>{t("Meanings")}</h3>
           {#each data.meanings as { definitions, partOfSpeech }}
-            <MeaningComponent word={data.word} {partOfSpeech} {definitions} />
+            <MeaningComponent
+              word={data.word}
+              {partOfSpeech}
+              {definitions}
+              on:lookupTerm={(event) => lookupTerm(event.detail)}
+            />
           {/each}
         </div>
+        {#if synonymPromise}
+          {#await synonymPromise then synonyms}
+            {#if synonyms.length}
+              <div class="container">
+                <h3>{t("Synonyms:")}</h3>
+                <p class="synonym-list">
+                  {#each synonyms as synonym, i}
+                    <button
+                      type="button"
+                      class="lookup-term-button"
+                      title={`${t("Look up")} "${synonym.word}"`}
+                      on:click={() => lookupTerm(synonym.word)}
+                    >
+                      {synonym.word}
+                    </button>{#if synonym.partsOfSpeech?.length}<span class="synonym-meta">
+                      ({synonym.partsOfSpeech.join(", ")})
+                    </span>{/if}{#if i < synonyms.length - 1}{", "}{/if}
+                  {/each}
+                </p>
+              </div>
+            {/if}
+          {/await}
+        {/if}
         {#if data.origin}
           <div class="container">
-            <h3>{t("Origin")}</h3>
+            <h3>{t("Etymology")}</h3>
             <OriginComponent {data} />
           </div>
         {/if}
@@ -251,6 +310,35 @@
     margin: auto;
     width: 100%;
     margin-top: 2rem;
+  }
+
+  .synonym-list {
+    line-height: 1.7;
+  }
+
+  .lookup-term-button {
+    background: none;
+    border: 0;
+    color: var(--text-normal);
+    cursor: pointer;
+    font: inherit;
+    margin: 0;
+    padding: 0;
+    text-decoration: underline;
+    text-decoration-color: var(--text-faint);
+    text-underline-offset: 0.15em;
+
+    &:hover,
+    &:focus-visible {
+      color: var(--interactive-accent);
+      text-decoration-color: var(--interactive-accent);
+    }
+  }
+
+  .synonym-meta {
+    color: var(--text-muted);
+    font-size: 0.875em;
+    margin-left: 0.25rem;
   }
 
   @keyframes spinner {

@@ -69,18 +69,23 @@ export default class APIManager {
         const api = this.getDefinitionAPI();
         const { cache, settings } = this.plugin;
         if (!api) {
+            const previousDefinition = await this.findPreviousDefinition(query);
+            if (previousDefinition) {
+                await this.plugin.localDictionary.recordLookup(previousDefinition);
+                return previousDefinition;
+            }
             throw new Error(`No definition provider is available for ${settings.defaultLanguage}`);
         }
 
         if (settings.useCaching && !api.name.toLowerCase().includes("offline")) {
-            const cachedDefinition = cache.cachedDefinitions.find((c) => { return c.content.word.toLowerCase() == query.toLowerCase() && c.lang == settings.defaultLanguage && c.api == api.name });
+            const cachedDefinition = this.findCachedDefinition(query, api.name, settings.defaultLanguage);
             //If cachedDefiniton exists return it as a Promise
             if (cachedDefinition) {
                 await this.plugin.localDictionary.recordLookup(cachedDefinition.content);
                 return cachedDefinition.content;
             } else {
                 //If it doesnt exist request a new Definition
-                const awaitedResult = await api.requestDefinitions(query, settings.defaultLanguage);
+                const awaitedResult = await this.requestDefinitionsWithFallback(api, query);
                 if (awaitedResult) {
                     cache.cachedDefinitions.push({ content: awaitedResult, api: api.name, lang: settings.defaultLanguage });
                     await this.plugin.saveCache();
@@ -90,10 +95,51 @@ export default class APIManager {
                 return awaitedResult;
             }
         } else {
-            const result = await api.requestDefinitions(query, this.plugin.settings.defaultLanguage);
+            const result = await this.requestDefinitionsWithFallback(api, query);
             await this.plugin.localDictionary.recordLookup(result);
             return result;
         }
+    }
+
+    private async requestDefinitionsWithFallback(api: DefinitionProvider, query: string): Promise<DictionaryWord> {
+        try {
+            return await api.requestDefinitions(query, this.plugin.settings.defaultLanguage);
+        } catch (error) {
+            const previousDefinition = await this.findPreviousDefinition(query);
+            if (previousDefinition) {
+                return previousDefinition;
+            }
+
+            throw error;
+        }
+    }
+
+    private async findPreviousDefinition(query: string): Promise<DictionaryWord | null> {
+        const cachedDefinition = this.findCachedDefinition(query);
+        if (cachedDefinition) {
+            return cachedDefinition.content;
+        }
+
+        return this.plugin.localDictionary.findRecordedLookup(query);
+    }
+
+    private findCachedDefinition(
+        query: string,
+        preferredApi?: string,
+        preferredLanguage?: string
+    ): { content: DictionaryWord; api: string; lang: string } | null {
+        const normalizedQuery = normalizeLookupTerm(query) ?? query.trim();
+        if (!normalizedQuery) return null;
+
+        const candidates = this.plugin.cache.cachedDefinitions.filter((cachedDefinition) => {
+            return cachedDefinition.content.word.toLowerCase() === normalizedQuery.toLowerCase();
+        });
+        if (!candidates.length) return null;
+
+        return candidates.sort((a, b) => {
+            return scoreCachedDefinition(b, preferredApi, preferredLanguage)
+                - scoreCachedDefinition(a, preferredApi, preferredLanguage);
+        })[0];
     }
 
     /**
@@ -186,4 +232,13 @@ export default class APIManager {
             ? this.partOfSpeechProvider.find((api) => api.name == this.plugin.settings.partOfSpeechApiName)
             : null;
     }
+}
+
+function scoreCachedDefinition(
+    cachedDefinition: { api: string; lang: string },
+    preferredApi?: string,
+    preferredLanguage?: string
+): number {
+    return (cachedDefinition.api === preferredApi ? 2 : 0)
+        + (cachedDefinition.lang === preferredLanguage ? 1 : 0);
 }

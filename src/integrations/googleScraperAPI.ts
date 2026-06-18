@@ -26,12 +26,11 @@ export class GoogleScraperDefinitionProvider extends Base implements DefinitionP
             url: `https://www.google.com/search?q=define+${query.replace(/\s/g, '+')}+${GoogleScraperDefinitionProvider.LANGUAGES[lang]}`,
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36' }
         });
-        console.log(result);
 
         const doc = new DOMParser().parseFromString(result.text, 'text/html');
         const data = doc.querySelector(`div[data-query-term=${query}]`);
 
-        if (!data) throw "";
+        if (!data) throw new Error(`Google did not return a dictionary result for "${query}".`);
 
         const def: DictionaryWord = {
             phonetics: [],

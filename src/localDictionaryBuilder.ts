@@ -5,7 +5,11 @@ import type { DictionarySettings } from "src/types";
 
 import t from "src/l10n/helpers";
 import { MarkdownView, Modal, normalizePath, Notice, TFile } from "obsidian";
-import { buildFlashcardEntry, upsertFlashcardEntry } from "./flashcards";
+import {
+    buildFlashcardEntry,
+    dictionaryWordFromFlashcardHistory,
+    upsertFlashcardEntry,
+} from "./flashcards";
 
 //This really needs a refactor
 
@@ -167,6 +171,19 @@ export default class LocalDictionaryBuilder {
         } catch (error) {
             console.error('Failed to open dictionary lookup history', error);
             new Notice(`Could not open dictionary lookup history: ${this.errorMessage(error)}`);
+        }
+    }
+
+    async findRecordedLookup(word: string): Promise<DictionaryWord | null> {
+        try {
+            const existing = this.plugin.app.vault.getAbstractFileByPath(this.getLookupHistoryPath());
+            if (!(existing instanceof TFile)) return null;
+
+            const current = await this.plugin.app.vault.read(existing);
+            return dictionaryWordFromFlashcardHistory(current, word);
+        } catch (error) {
+            console.error('Failed to read dictionary lookup history', error);
+            return null;
         }
     }
 

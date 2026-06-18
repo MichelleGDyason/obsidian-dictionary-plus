@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildFlashcardEntry, upsertFlashcardEntry } from "../src/flashcards.ts";
+import {
+    buildFlashcardEntry,
+    dictionaryWordFromFlashcardHistory,
+    upsertFlashcardEntry,
+} from "../src/flashcards.ts";
 
 test("builds a Spaced Repetition single-line card from every definition", () => {
     const result = buildFlashcardEntry({
@@ -80,5 +84,41 @@ test("replaces an existing lookup history block for the same word", () => {
     assert.equal(
         upsertFlashcardEntry(current, entry),
         "# Dictionary lookup flashcards\n\n#flashcards\n\nTest::noun: A complete definition. | noun: Another definition.\n<!-- obsidian-dictionary:en-US:test -->\n\n"
+    );
+});
+
+test("rebuilds a dictionary word from lookup history", () => {
+    const markdown = [
+        "# Dictionary lookup flashcards",
+        "",
+        "decipher::noun: A decipherment; a decoding. | verb: To decode a code. | verb: To read obscure text.",
+        "<!--SR:!2026-06-21,4,270-->",
+        "<!-- obsidian-dictionary:en-US:decipher -->",
+        "",
+    ].join("\n");
+
+    assert.deepEqual(
+        dictionaryWordFromFlashcardHistory(markdown, "Decipher"),
+        {
+            word: "decipher",
+            phonetics: [],
+            meanings: [{
+                partOfSpeech: "noun",
+                definitions: [{ definition: "A decipherment; a decoding." }],
+            }, {
+                partOfSpeech: "verb",
+                definitions: [
+                    { definition: "To decode a code." },
+                    { definition: "To read obscure text." },
+                ],
+            }],
+        }
+    );
+});
+
+test("returns null when lookup history has no matching dictionary marker", () => {
+    assert.equal(
+        dictionaryWordFromFlashcardHistory("other::definition", "missing"),
+        null
     );
 });

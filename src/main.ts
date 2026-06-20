@@ -169,7 +169,7 @@ export default class DictionaryPlugin extends Plugin {
             this.contextMenuTerm = term;
             this.contextMenuTermAt = Date.now();
             this.contextMenuTermHandled = false;
-            if (this.shouldShowStandaloneMarkdownLookupMenu(event)) {
+            if (this.shouldShowModifiedReadingModeLookupMenu(event)) {
                 this.contextMenuTermHandled = this.showLookupMenuAtMouseEvent(event, term);
             }
         });
@@ -347,7 +347,11 @@ export default class DictionaryPlugin extends Plugin {
         });
     }
 
-    private shouldShowStandaloneMarkdownLookupMenu(event: MouseEvent): boolean {
+    private shouldShowModifiedReadingModeLookupMenu(event: MouseEvent): boolean {
+        if (!event.shiftKey && !event.altKey) {
+            return false;
+        }
+
         const target = event.target;
         if (!(target instanceof Element) || !target.closest('.markdown-preview-view')) {
             return false;

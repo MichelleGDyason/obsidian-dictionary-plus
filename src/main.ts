@@ -67,6 +67,7 @@ export default class DictionaryPlugin extends Plugin {
     private lastSelectionAt = 0;
     private contextMenuTerm: string | null = null;
     private contextMenuTermAt = 0;
+    private contextMenuTermHandled = false;
     private menusWithLookup = new WeakSet<Menu>();
 
     async onload(): Promise<void> {
@@ -167,6 +168,10 @@ export default class DictionaryPlugin extends Plugin {
             this.captureSelection(term);
             this.contextMenuTerm = term;
             this.contextMenuTermAt = Date.now();
+            this.contextMenuTermHandled = false;
+            if (this.shouldShowStandaloneMarkdownLookupMenu(event)) {
+                this.contextMenuTermHandled = this.showLookupMenuAtMouseEvent(event, term);
+            }
         });
         
         this.registerEvent(this.app.workspace.on('editor-menu', this.handleContextMenuHelper));
@@ -205,12 +210,14 @@ export default class DictionaryPlugin extends Plugin {
     }
 
     handleContextMenuHelper = (menu: Menu, editor: Editor, _: MarkdownView): void => {
-        handleContextMenu(menu, editor, this);
+        if (handleContextMenu(menu, editor, this)) {
+            this.contextMenuTermHandled = true;
+        }
     };
 
-    addLookupMenuItem(menu: Menu, term: string): void {
+    addLookupMenuItem(menu: Menu, term: string): boolean {
         if (!this.settings.contextMenuLookup || !claimLookupMenu(menu, this.menusWithLookup)) {
-            return;
+            return false;
         }
 
         menu.addItem((item) => {
@@ -221,6 +228,7 @@ export default class DictionaryPlugin extends Plugin {
                     void this.lookup(term);
                 });
         });
+        return true;
     }
 
     showLookupMenuAtMouseEvent(event: MouseEvent, term: string): boolean {
@@ -238,8 +246,16 @@ export default class DictionaryPlugin extends Plugin {
 
     private addPendingContextMenuLookup(menu: Menu): void {
         if (isRecentContextMenuTerm(this.contextMenuTermAt) && this.contextMenuTerm) {
-            this.addLookupMenuItem(menu, this.contextMenuTerm);
+            if (this.addLookupMenuItem(menu, this.contextMenuTerm)) {
+                this.contextMenuTermHandled = true;
+            }
         }
+    }
+
+    getPendingContextMenuTerm(): string | null {
+        return isRecentContextMenuTerm(this.contextMenuTermAt)
+            ? this.contextMenuTerm
+            : null;
     }
 
     captureSelection(value: string | null | undefined): string | null {
@@ -329,6 +345,26 @@ export default class DictionaryPlugin extends Plugin {
                 '.markdown-source-view, .markdown-preview-view, .metadata-container, .metadata-properties'
             );
         });
+    }
+
+    private shouldShowStandaloneMarkdownLookupMenu(event: MouseEvent): boolean {
+        const target = event.target;
+        if (!(target instanceof Element) || !target.closest('.markdown-preview-view')) {
+            return false;
+        }
+
+        return !target.closest([
+            'a',
+            'button',
+            'input',
+            'select',
+            'textarea',
+            '.internal-link',
+            '.external-link',
+            '.tag',
+            '.metadata-container',
+            '.metadata-properties',
+        ].join(', '));
     }
 
     private getWordAtPoint(x: number, y: number, ownerDocument = activeDocument): string | null {

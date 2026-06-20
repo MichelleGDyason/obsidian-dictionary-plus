@@ -2,11 +2,11 @@ import type { Editor, Menu } from "obsidian";
 import t from "src/l10n/helpers";
 import type DictionaryPlugin from "src/main";
 
-export default function handleContextMenu(menu: Menu, instance: Editor, plugin: DictionaryPlugin): void {
+export default function handleContextMenu(menu: Menu, instance: Editor, plugin: DictionaryPlugin): boolean {
     if (!plugin.settings.contextMenuLookup) {
-        return;
+        return false;
     }
-    const selection = plugin.getLookupTerm(instance);
+    const selection = plugin.getPendingContextMenuTerm() ?? plugin.getLookupTerm(instance);
 
     if (selection) {
         if (!plugin.settings.shouldShowSynonymPopover) {
@@ -18,6 +18,8 @@ export default function handleContextMenu(menu: Menu, instance: Editor, plugin: 
                     });
             });
         }
-        plugin.addLookupMenuItem(menu, selection);
+        return plugin.addLookupMenuItem(menu, selection);
     }
+
+    return false;
 }

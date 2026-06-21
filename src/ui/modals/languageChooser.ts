@@ -22,14 +22,19 @@ export default class LanguageChooser extends FuzzySuggestModal<string>{
     }
 
     getItemText(item: string): string {
+        const label = LANGUAGES[item as keyof typeof LANGUAGES] ?? item;
         if(item == this.plugin.settings.defaultLanguage) {
-            return LANGUAGES[item] + ' 🗸';
+            return label + ' 🗸';
         } else {
-            return LANGUAGES[item];
+            return label;
         }
     }
 
-    async onChooseItem(item: string): Promise<void> {
+    onChooseItem(item: string): void {
+        void this.chooseItem(item);
+    }
+
+    private async chooseItem(item: string): Promise<void> {
         this.plugin.settings.defaultLanguage = item as keyof typeof LANGUAGES;
         this.plugin.settings.normalLang = item as keyof typeof LANGUAGES;
         await this.plugin.saveSettings();

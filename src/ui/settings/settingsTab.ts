@@ -5,6 +5,21 @@ import { DEFAULT_SETTINGS, LANGUAGES } from "src/_constants";
 import InfoModalComponent from './infoModal.svelte'
 import t from "src/l10n/helpers";
 
+type InfoModalComponentInstance = {
+    $destroy(): void;
+};
+
+type InfoModalComponentConstructor = new (options: {
+    target: HTMLElement;
+    props: {
+        synonymAPIs: DictionaryPlugin["manager"]["synonymProvider"];
+        definitionAPIs: DictionaryPlugin["manager"]["definitionProvider"];
+        partOfSpeechAPIs: DictionaryPlugin["manager"]["partOfSpeechProvider"];
+    };
+}) => InfoModalComponentInstance;
+
+const TypedInfoModalComponent = InfoModalComponent as unknown as InfoModalComponentConstructor;
+
 export default class SettingsTab extends PluginSettingTab {
     plugin: DictionaryPlugin;
 
@@ -14,6 +29,10 @@ export default class SettingsTab extends PluginSettingTab {
     }
 
     display(): void {
+        this.renderSettings();
+    }
+
+    private renderSettings(): void {
         const { containerEl, plugin } = this;
 
         containerEl.empty();
@@ -26,15 +45,15 @@ export default class SettingsTab extends PluginSettingTab {
             .setName(t('Language'))
             .setDesc(t('The Language the Plugin will use to search for Definitions and Pronunciations.'))
             .addDropdown((dropdown) => {
-                for (const language in LANGUAGES) {
-                    dropdown.addOption(language, LANGUAGES[language]);
+                for (const [language, label] of Object.entries(LANGUAGES) as Array<[keyof typeof LANGUAGES, string]>) {
+                    dropdown.addOption(language, label);
                 }
                 dropdown.setValue(plugin.settings.normalLang)
                     .onChange(async (value) => {
                         plugin.settings.defaultLanguage = value as keyof typeof LANGUAGES;
                         plugin.settings.normalLang = value as keyof typeof LANGUAGES;
                         await this.save();
-                        this.display();
+                        this.renderSettings();
                     });
             });
         new Setting(containerEl)
@@ -154,7 +173,7 @@ export default class SettingsTab extends PluginSettingTab {
                     .onChange(async (value) => {
                         plugin.settings.saveLookupHistory = value;
                         await this.save();
-                        this.display();
+                        this.renderSettings();
                     });
             });
         new Setting(containerEl)
@@ -271,7 +290,7 @@ export default class SettingsTab extends PluginSettingTab {
                     plugin.cache.cachedDefinitions = [];
                     await this.plugin.saveCache();
                     new Notice(t("Success"));
-                    this.display();
+                    this.renderSettings();
                 });
             });
 
@@ -312,7 +331,7 @@ export default class SettingsTab extends PluginSettingTab {
 
 class InfoModal extends Modal {
     plugin: DictionaryPlugin;
-    private _view: InfoModalComponent;
+    private _view: InfoModalComponentInstance | null = null;
 
     constructor(plugin: DictionaryPlugin) {
         super(plugin.app);
@@ -321,7 +340,7 @@ class InfoModal extends Modal {
 
     onOpen() {
         this.modalEl.addClass("dictionary-info-modal");
-        this._view = new InfoModalComponent({
+        this._view = new TypedInfoModalComponent({
             target: this.contentEl,
             props: {
                 synonymAPIs: this.plugin.manager.synonymProvider,
@@ -332,7 +351,7 @@ class InfoModal extends Modal {
     }
 
     onClose() {
-        this._view.$destroy();
+        this._view?.$destroy();
         this.contentEl.empty();
     }
 }

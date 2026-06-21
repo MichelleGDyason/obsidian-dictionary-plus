@@ -7,10 +7,26 @@ import LanguageChooser from "src/ui/modals/languageChooser";
 import DefinitionProviderChooser from "src/ui/modals/definitionProviderChooser";
 import { getWordFromTextNode, normalizeLookupTerm } from "src/selection";
 
+type DictionaryComponentInstance = {
+    $destroy(): void;
+    searchFor(query: string): void;
+    focusSearch(): void;
+};
+
+type DictionaryComponentConstructor = new (options: {
+    target: HTMLElement;
+    props: {
+        manager: DictionaryPlugin["manager"];
+        localDictionary: DictionaryPlugin["localDictionary"];
+    };
+}) => DictionaryComponentInstance;
+
+const TypedDictionaryComponent = DictionaryComponent as unknown as DictionaryComponentConstructor;
+
 export default class DictionaryView extends ItemView {
 
     plugin: DictionaryPlugin;
-    private _view: DictionaryComponent;
+    private _view: DictionaryComponentInstance | null = null;
     private pendingQuery: string | null = null;
 
     constructor(leaf: WorkspaceLeaf, plugin: DictionaryPlugin) {
@@ -43,12 +59,12 @@ export default class DictionaryView extends ItemView {
     }
 
     onClose(): Promise<void> {
-        this._view.$destroy();
+        this._view?.$destroy();
         return super.onClose();
     }
 
     onOpen(): Promise<void> {
-        this._view = new DictionaryComponent({
+        this._view = new TypedDictionaryComponent({
             target: this.contentEl,
             props: {
                 manager: this.plugin.manager,
@@ -103,16 +119,10 @@ export default class DictionaryView extends ItemView {
                 offsetNode: Node;
                 offset: number;
             } | null;
-            caretRangeFromPoint?: (x: number, y: number) => Range | null;
         };
 
         const position = documentWithCaret.caretPositionFromPoint?.(event.clientX, event.clientY);
-        if (position) {
-            return getWordFromTextNode(position.offsetNode, position.offset);
-        }
-
-        const range = documentWithCaret.caretRangeFromPoint?.(event.clientX, event.clientY);
-        return range ? getWordFromTextNode(range.startContainer, range.startOffset) : null;
+        return position ? getWordFromTextNode(position.offsetNode, position.offset) : null;
     }
 
     private containsNode(node: Node | null): boolean {

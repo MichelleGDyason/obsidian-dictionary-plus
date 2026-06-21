@@ -1,5 +1,6 @@
 import { request } from 'obsidian';
 import type { Synonym, SynonymProvider } from "src/integrations/types";
+import { toError } from "src/safeTypes";
 
 export class SynonymoSynonymAPI implements SynonymProvider {
 
@@ -25,21 +26,29 @@ export class SynonymoSynonymAPI implements SynonymProvider {
         try {
             result = await request({url: this.constructRequest(query)});
         } catch (error) {
-            return Promise.reject(error);
+            throw toError(error);
         }
 
         if(!result){
-            return Promise.reject("Word doesnt exist in this Dictionary");
+            throw new Error("Word doesnt exist in this Dictionary");
         }
 
         const parser = new DOMParser();
 
         const doc = parser.parseFromString(result, 'text/html');
 
-        const x = doc.body.getElementsByClassName("fiche").item(0).getElementsByClassName("word");
+        const fiche = doc.body.getElementsByClassName("fiche").item(0);
+        if (!fiche) {
+            throw new Error("Word doesnt exist in this Dictionary");
+        }
+
+        const x = fiche.getElementsByClassName("word");
 
         for(let i = 0; i < x.length; i++){
-            synonyms.push({word: x.item(i).textContent});
+            const word = x.item(i)?.textContent;
+            if (word) {
+                synonyms.push({word});
+            }
         }
         
         return synonyms;

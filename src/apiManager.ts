@@ -164,7 +164,7 @@ export default class APIManager {
         if (settings.useCaching && !api.name.toLowerCase().includes("offline")) {
             const cachedSynonymCollection = cache.cachedSynonyms.find((s) => { return s.word.toLowerCase() == query.toLowerCase() && s.lang == settings.defaultLanguage && s.api == api.name });
             if (cachedSynonymCollection) {
-                return new Promise((resolve) => resolve(cachedSynonymCollection.content));
+                return cachedSynonymCollection.content;
             } else {
                 const result = api.requestSynonyms(query, settings.defaultLanguage);
                 const awaitedResult = await result;
@@ -196,7 +196,12 @@ export default class APIManager {
         leftContext: string,
         rightContext: string
     ): Promise<PartOfSpeech> {
-        return this.getPartOfSpeechAPI()?.requestPartOfSpeech(
+        const api = this.getPartOfSpeechAPI();
+        if (!api) {
+            throw new Error("No part of speech provider is available");
+        }
+
+        return api.requestPartOfSpeech(
             word,
             leftContext,
             rightContext,

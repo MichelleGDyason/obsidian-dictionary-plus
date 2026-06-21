@@ -22,6 +22,7 @@ import {
     replaceLookupTermInSelection,
 } from './selection';
 import { claimLookupMenu, isRecentContextMenuTerm } from './contextMenu';
+import { isRecord, parseJson } from './safeTypes';
 
 interface PdfMenuContext {
     selection?: string;
@@ -191,12 +192,10 @@ export default class DictionaryPlugin extends Plugin {
 
         this.registerEvent(this.app.workspace.on('file-open', (file) => {
             if (file && this.settings.getLangFromFile) {
-                let lang = this.app.metadataCache.getFileCache(file)?.frontmatter?.lang ?? null;
-                if (!lang) {
-                    lang = this.app.metadataCache.getFileCache(file)?.frontmatter?.language ?? null;
-                }
-                if (lang && Object.values(RFC).includes(lang)) {
-                    this.settings.defaultLanguage = Object.keys(RFC)[Object.values(RFC).indexOf(lang)] as keyof APISettings;
+                const lang = getFrontmatterLanguage(this.app.metadataCache.getFileCache(file)?.frontmatter);
+                const apiLanguage = getApiLanguageFromRFC(lang);
+                if (apiLanguage) {
+                    this.settings.defaultLanguage = apiLanguage;
                 } else {
                     this.settings.defaultLanguage = this.settings.normalLang;
                 }
@@ -377,15 +376,9 @@ export default class DictionaryPlugin extends Plugin {
                 offsetNode: Node;
                 offset: number;
             } | null;
-            caretRangeFromPoint?: (x: number, y: number) => Range | null;
         };
         const position = documentWithCaret.caretPositionFromPoint?.(x, y);
-        if (position) {
-            return getWordFromTextNode(position.offsetNode, position.offset);
-        }
-
-        const range = documentWithCaret.caretRangeFromPoint?.(x, y);
-        return range ? getWordFromTextNode(range.startContainer, range.startOffset) : null;
+        return position ? getWordFromTextNode(position.offsetNode, position.offset) : null;
     }
 
     // Open the synonym popover if a word is selected
@@ -448,7 +441,7 @@ export default class DictionaryPlugin extends Plugin {
     );
 
     async loadSettings(): Promise<void> {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, toPartialDictionarySettings(await this.loadData()));
         if (this.settings.apiSettings.en_GB.synonymApiName === null) {
             this.settings.apiSettings.en_GB.synonymApiName = 'Free Dictionary API';
             await this.saveData(this.settings);
@@ -464,7 +457,7 @@ export default class DictionaryPlugin extends Plugin {
         if (!(await this.app.vault.adapter.exists(path))) {
             await this.app.vault.adapter.write(path, "{}");
         }
-        return JSON.parse(await this.app.vault.adapter.read(path)) as DictionaryCache;
+        return toDictionaryCache(parseJson(await this.app.vault.adapter.read(path)));
     }
 
     async saveCache(): Promise<void> {
@@ -474,4 +467,59 @@ export default class DictionaryPlugin extends Plugin {
     async saveSettings(): Promise<void> {
         await this.saveData(this.settings);
     }
+}
+
+function getFrontmatterLanguage(frontmatter: unknown): string | null {
+    if (!isRecord(frontmatter)) return null;
+
+    const lang = frontmatter.lang ?? frontmatter.language;
+    return typeof lang === "string" ? lang : null;
+}
+
+function getApiLanguageFromRFC(lang: string | null): keyof APISettings | null {
+    if (!lang) return null;
+
+    const matchingEntry = (Object.entries(RFC) as Array<[keyof APISettings, string]>)
+        .find(([, rfc]) => rfc === lang);
+    return matchingEntry?.[0] ?? null;
+}
+
+function toPartialDictionarySettings(value: unknown): Partial<DictionarySettings> {
+    return isRecord(value) ? value as Partial<DictionarySettings> : {};
+}
+
+function toDictionaryCache(value: unknown): DictionaryCache {
+    if (!isRecord(value)) return DEFAULT_CACHE;
+
+    return {
+        cachedDefinitions: Array.isArray(value.cachedDefinitions)
+            ? value.cachedDefinitions.filter(isCachedDefinition)
+            : [],
+        cachedSynonyms: Array.isArray(value.cachedSynonyms)
+            ? value.cachedSynonyms.filter(isCachedSynonymCollection)
+            : [],
+    };
+}
+
+function isCachedDefinition(value: unknown): value is DictionaryCache["cachedDefinitions"][number] {
+    return isRecord(value)
+        && typeof value.api === "string"
+        && typeof value.lang === "string"
+        && isDictionaryWord(value.content);
+}
+
+function isCachedSynonymCollection(value: unknown): value is DictionaryCache["cachedSynonyms"][number] {
+    return isRecord(value)
+        && typeof value.api === "string"
+        && typeof value.lang === "string"
+        && typeof value.word === "string"
+        && Array.isArray(value.content)
+        && value.content.every((synonym) => isRecord(synonym) && typeof synonym.word === "string");
+}
+
+function isDictionaryWord(value: unknown): value is DictionaryCache["cachedDefinitions"][number]["content"] {
+    return isRecord(value)
+        && typeof value.word === "string"
+        && Array.isArray(value.phonetics)
+        && Array.isArray(value.meanings);
 }

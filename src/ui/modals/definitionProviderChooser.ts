@@ -21,7 +21,10 @@ export default class DefinitionProviderChooser extends FuzzySuggestModal<string>
 
     onOpen(): void {
         if (this.available.length <= 1) {
-            this.onChooseItem(this.available[0] ?? null);
+            const onlyAvailableProvider = this.available[0];
+            if (onlyAvailableProvider) {
+                void this.chooseItem(onlyAvailableProvider);
+            }
         }
         super.onOpen();
     }
@@ -34,7 +37,11 @@ export default class DefinitionProviderChooser extends FuzzySuggestModal<string>
         return item;
     }
 
-    async onChooseItem(item: string): Promise<void> {
+    onChooseItem(item: string): void {
+        void this.chooseItem(item);
+    }
+
+    private async chooseItem(item: string): Promise<void> {
         const lang = this.plugin.settings.defaultLanguage;
         this.plugin.settings.apiSettings[lang].definitionApiName = item;
         await this.plugin.saveSettings();

@@ -1,6 +1,7 @@
 import { request } from 'obsidian';
 import { DefinitionProvider, DictionaryWord, Meaning, PartOfSpeech, Synonym, SynonymProvider } from "src/integrations/types";
 import { isNotFoundRequestError } from "src/requestErrors";
+import { isRecord, isStringArray, parseJson, toError } from "src/safeTypes";
 
 abstract class Base {
     API_END_POINT = "https://api.dictionaryapi.dev/api/v2/entries/";
@@ -9,7 +10,7 @@ abstract class Base {
     public url = "https://dictionaryapi.dev/";
     offline = false;
 
-    languageCodes = {
+    languageCodes: Record<string, string> = {
         "en_US": "en",
         "hi": "hi",
         "es": "es",
@@ -66,16 +67,10 @@ export class FreeDictionaryDefinitionProvider extends Base implements Definition
             const url = this.constructRequest(encodeURIComponent(query), this.languageCodes[lang]);
             result = await request({url});
         } catch (error) {
-            return Promise.reject(error);
+            throw toError(error);
         }
 
-        const json = (await JSON.parse(result) as DictionaryWord[]);
-
-        if(!json || json["title"]){
-            throw new Error(json["title"] ?? "Word doesnt exist in this Dictionary");
-        }
-
-        return json[0];
+        return parseFreeDictionaryWord(result);
     }
 }
 
@@ -119,14 +114,14 @@ export class FreeDictionarySynonymProvider extends Base implements SynonymProvid
             if (isNotFoundRequestError(error)) {
                 return [];
             }
-            return Promise.reject(error);
+            throw toError(error);
         }
         
         if(!result){
             throw new Error("Word doesnt exist in this Dictionary");
         }
 
-        const meanings: Meaning[] = (await JSON.parse(result) as DictionaryWord[])[0].meanings;
+        const meanings = parseFreeDictionaryWord(result).meanings;
         const synonyms: Synonym[] = [];
 
         // The default POS provider seems pretty wonky at the moment,
@@ -160,4 +155,73 @@ export class FreeDictionarySynonymProvider extends Base implements SynonymProvid
 
         return synonyms.concat(nonPOSMatch);
     }
+}
+
+function parseFreeDictionaryWord(result: string): DictionaryWord {
+    const json = parseJson(result);
+
+    if (isRecord(json)) {
+        const title = json.title;
+        throw new Error(typeof title === "string" ? title : "Word doesnt exist in this Dictionary");
+    }
+
+    if (!Array.isArray(json)) {
+        throw new Error("Invalid response from Free Dictionary API");
+    }
+
+    const word = toDictionaryWord(json[0]);
+    if (!word) {
+        throw new Error("Invalid response from Free Dictionary API");
+    }
+
+    return word;
+}
+
+function toDictionaryWord(value: unknown): DictionaryWord | null {
+    if (!isRecord(value) || typeof value.word !== "string" || !Array.isArray(value.meanings)) {
+        return null;
+    }
+
+    const meanings = value.meanings.map(toMeaning).filter((meaning): meaning is Meaning => Boolean(meaning));
+    if (!meanings.length) return null;
+
+    const dictionaryWord: DictionaryWord = {
+        word: value.word,
+        phonetics: Array.isArray(value.phonetics)
+            ? value.phonetics.flatMap((phonetic) => {
+                if (!isRecord(phonetic) || typeof phonetic.text !== "string") return [];
+                return [{
+                    text: phonetic.text,
+                    audio: typeof phonetic.audio === "string" ? phonetic.audio : undefined,
+                }];
+            })
+            : [],
+        meanings,
+    };
+
+    if (typeof value.origin === "string") {
+        dictionaryWord.origin = value.origin;
+    }
+
+    return dictionaryWord;
+}
+
+function toMeaning(value: unknown): Meaning | null {
+    if (!isRecord(value) || typeof value.partOfSpeech !== "string" || !Array.isArray(value.definitions)) {
+        return null;
+    }
+
+    return {
+        partOfSpeech: value.partOfSpeech,
+        definitions: value.definitions.flatMap((definition) => {
+            if (!isRecord(definition) || typeof definition.definition !== "string") return [];
+
+            return [{
+                definition: definition.definition,
+                example: typeof definition.example === "string" ? definition.example : undefined,
+                synonyms: isStringArray(definition.synonyms) ? definition.synonyms : undefined,
+                antonyms: isStringArray(definition.antonyms) ? definition.antonyms : undefined,
+            }];
+        }),
+    };
 }

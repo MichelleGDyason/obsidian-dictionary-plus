@@ -1,5 +1,6 @@
 import { request } from 'obsidian';
 import type { Synonym, SynonymProvider } from "src/integrations/types";
+import { isRecord, parseJson, toError } from "src/safeTypes";
 
 export class OpenThesaurusSynonymAPI implements SynonymProvider {
     API_END_POINT = "https://www.openthesaurus.de/synonyme/search?q=";
@@ -23,27 +24,34 @@ export class OpenThesaurusSynonymAPI implements SynonymProvider {
         try {
             result = await request({url: this.constructRequest(query)});
         } catch (error) {
-            return Promise.reject(error);
+            throw toError(error);
         }
 
         if(!result){
-            return Promise.reject("Word doesnt exist in this Dictionary");
+            throw new Error("Word doesnt exist in this Dictionary");
         }
 
-        const response = await JSON.parse(result);
+        const response = parseJson(result);
 
-        if(!response.synsets){
-            return Promise.reject("Word doesnt exist in this Dictionary");
+        if(!isRecord(response) || !Array.isArray(response.synsets)){
+            throw new Error("Word doesnt exist in this Dictionary");
         }
         
         if (response.synsets.length <= 0) {
-            return Promise.reject("No Synonym found");
+            throw new Error("No Synonym found");
         }
-        const synonymList: Array<Record<string, string>> = response.synsets[0].terms;
+
+        const firstSynset: unknown = response.synsets[0];
+        if (!isRecord(firstSynset) || !Array.isArray(firstSynset.terms)) {
+            throw new Error("No Synonym found");
+        }
 
         const synonyms: Synonym[] = [];
-        synonymList.forEach((synonym) => {
-            const word: string = synonym["term"];
+        firstSynset.terms.forEach((synonym) => {
+            if (!isRecord(synonym) || typeof synonym.term !== "string") {
+                return;
+            }
+            const word = synonym.term;
             if (query != word) {
                 synonyms.push({ word: word });
             }

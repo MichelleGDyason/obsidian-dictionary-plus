@@ -1,5 +1,6 @@
 import { request } from "obsidian";
 import type{ PartOfSpeech, Synonym, SynonymProvider } from "src/integrations/types";
+import { isRecord, parseJson, toError } from "src/safeTypes";
 
 export class AltervistaSynonymProvider implements SynonymProvider {
     name = "Altervista";
@@ -13,7 +14,7 @@ export class AltervistaSynonymProvider implements SynonymProvider {
         "de",
     ];
 
-    languageCodes = {
+    languageCodes: Record<string, string> = {
         "es": "es_ES",
         "it": "it_IT",
         "fr": "fr_FR",
@@ -29,16 +30,22 @@ export class AltervistaSynonymProvider implements SynonymProvider {
         try {
             result = await request({url: this.constructRequest(encodeURIComponent(query), lang)});
         } catch (error) {
-            return Promise.reject(error);
+            throw toError(error);
         }
 
         if(!result){
-            return Promise.reject("Word doesnt exist in this Dictionary");
+            throw new Error("Word doesnt exist in this Dictionary");
         }
 
-        const json = await JSON.parse(result);
+        const json = parseJson(result);
+        if (!isRecord(json) || !Array.isArray(json.response)) {
+            throw new Error("Invalid response from Altervista");
+        }
 
         for(const c of json.response){
+            if (!isRecord(c) || !isRecord(c.list) || typeof c.list.synonyms !== "string") {
+                continue;
+            }
             const words = c.list.synonyms.split('|');
             words.forEach((word: string) => {
                 synonyms.push({word: word});

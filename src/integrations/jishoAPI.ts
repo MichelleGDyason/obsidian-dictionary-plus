@@ -1,5 +1,6 @@
 import { DefinitionProvider, DictionaryWord } from "src/integrations/types";
 import { requestUrl } from "obsidian";
+import { isRecord, isStringArray } from "src/safeTypes";
 
 class Base {
     name = "Jisho";
@@ -37,11 +38,12 @@ export class JishoDefinitionProvider
                 url: `${this.base_url}/search/words?keyword=${query}`,
             });
 
-            const json = result.json;
-            console.log(json);
-
-            const data = json.data as JishoDefinition[];
+            const json: unknown = result.json;
+            const data = toJishoDefinitions(json);
             const word = data[0];
+            if (!word) {
+                throw new Error("Word doesnt exist in Jisho");
+            }
 
             const definition: DictionaryWord = {
                 word: word.japanese[0].word,
@@ -65,4 +67,68 @@ export class JishoDefinitionProvider
 
             return definition;
         };
+}
+
+function toJishoDefinitions(value: unknown): JishoDefinition[] {
+    if (!isRecord(value) || !Array.isArray(value.data)) {
+        return [];
+    }
+
+    return value.data.flatMap((entry) => {
+        if (!isRecord(entry)) return [];
+
+        const japanese = Array.isArray(entry.japanese)
+            ? entry.japanese.flatMap((japaneseEntry) => {
+                if (
+                    !isRecord(japaneseEntry)
+                    || typeof japaneseEntry.word !== "string"
+                    || typeof japaneseEntry.reading !== "string"
+                ) {
+                    return [];
+                }
+
+                return [{
+                    word: japaneseEntry.word,
+                    reading: japaneseEntry.reading,
+                }];
+            })
+            : [];
+
+        const senses = Array.isArray(entry.senses)
+            ? entry.senses.flatMap((sense) => {
+                if (
+                    !isRecord(sense)
+                    || !isStringArray(sense.english_definitions)
+                    || !isStringArray(sense.parts_of_speech)
+                ) {
+                    return [];
+                }
+
+                return [{
+                    english_definitions: sense.english_definitions,
+                    parts_of_speech: sense.parts_of_speech,
+                }];
+            })
+            : [];
+
+        if (
+            typeof entry.slug !== "string"
+            || typeof entry.is_common !== "boolean"
+            || !isStringArray(entry.tags)
+            || !isStringArray(entry.jlpt)
+            || !japanese.length
+            || !senses.length
+        ) {
+            return [];
+        }
+
+        return [{
+            slug: entry.slug,
+            is_common: entry.is_common,
+            tags: entry.tags,
+            jlpt: entry.jlpt,
+            japanese,
+            senses,
+        }];
+    });
 }

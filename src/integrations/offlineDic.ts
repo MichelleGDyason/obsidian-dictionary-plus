@@ -2,6 +2,7 @@ import type { Phonetic, Meaning, Definition, OfflineDic } from './types';
 import type APIManager from 'src/apiManager';
 import { normalizePath, request } from 'obsidian';
 import type { DefinitionProvider, DictionaryWord } from "src/integrations/types";
+import { isRecord, parseJson } from "src/safeTypes";
 
 export class OfflineDictionary implements DefinitionProvider {
     public name = "Offline Dictionary";
@@ -52,7 +53,11 @@ export class OfflineDictionary implements DefinitionProvider {
                 const data = await request({ url: `https://raw.githubusercontent.com/MichelleGDyason/obsidian-dictionary-plus/${plugin.manifest.version}/dictionary.json` });
                 await adapter.write(path, data);
             }
-            this.offlineDic = JSON.parse(await adapter.read(path));
+            const dictionary = parseJson(await adapter.read(path));
+            if (!isRecord(dictionary)) {
+                throw new Error("Invalid offline dictionary data");
+            }
+            this.offlineDic = dictionary as Record<string, OfflineDic>;
         }
         return this.offlineDic;
     }

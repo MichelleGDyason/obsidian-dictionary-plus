@@ -19,9 +19,26 @@ export interface SynonymProviderSettings {
     onSelect: (newWord: string) => void
 }
 
+type SynonymPopoverComponentInstance = {
+    $destroy(): void;
+};
+
+type SynonymPopoverComponentConstructor = new (options: {
+    intro: boolean;
+    target: HTMLElement;
+    props: {
+        coords: Coords;
+        synonyms: Synonym[];
+        onSelect: (selection: string) => void;
+        onClickOutside: () => void;
+    };
+}) => SynonymPopoverComponentInstance;
+
+const TypedSynonymPopoverComponent = SynonymPopoverComponent as unknown as SynonymPopoverComponentConstructor;
+
 export class SynonymPopover {
     private settings: SynonymProviderSettings;
-    private _view: SynonymPopoverComponent;
+    private _view: SynonymPopoverComponentInstance | null = null;
     private isDestroyed = false;
 
     constructor(settings: SynonymProviderSettings) {
@@ -54,7 +71,7 @@ export class SynonymPopover {
                 const before = sentence.substring(0, cursor.ch - seen)
                 const after = sentence.substring(cursor.ch - seen + selection.length)
 
-                let pos: PartOfSpeech;
+                let pos: PartOfSpeech | undefined;
 
                 if(this.settings.advancedPoS){
                     try {
@@ -80,13 +97,13 @@ export class SynonymPopover {
                 if (!synonyms?.length) return;
 
                 // Open the synonym popover
-                this._view = new SynonymPopoverComponent({
+                this._view = new TypedSynonymPopoverComponent({
                     intro: true,
                     target: activeDocument.body,
                     props: {
                         coords,
                         synonyms,
-                        onSelect: (selection) => {
+                        onSelect: (selection: string) => {
                             onSelect(selection);
                             this.destroy();
                         },

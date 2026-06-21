@@ -1,6 +1,8 @@
+import { requestUrl } from "obsidian";
 import { PartOfSpeech, PartOfSpeechProvider } from "./types";
+import { isRecord, toError } from "src/safeTypes";
 
-const langMap = {
+const langMap: Record<string, string> = {
     ar: "ar",
     de: "de",
     en_US: "en",
@@ -60,8 +62,8 @@ export class SystranPOSProvider implements PartOfSpeechProvider {
      * @param lang - The language defined in settings
      * @returns A language code systran supports
      */
-    private mapLanguage(lang: string) {
-        return langMap[lang];
+    private mapLanguage(lang: string): string {
+        return langMap[lang] ?? "en";
     }
 
     /**
@@ -77,24 +79,23 @@ export class SystranPOSProvider implements PartOfSpeechProvider {
         rightContext: string,
         lang: string
     ): Promise<PartOfSpeech> {
-        let result: Response;
+        let result: unknown;
         try {
-            result = await fetch(
-                this.constructRequest(leftContext + word + rightContext, lang),
-                {
-                    method: "GET",
-                    headers: {
-                        "x-rapidapi-key": atob(this.key),
-                        "x-rapidapi-host":
-                            "systran-systran-platform-for-language-processing-v1.p.rapidapi.com",
-                    },
-                }
-            );
+            const response = await requestUrl({
+                url: this.constructRequest(leftContext + word + rightContext, lang),
+                method: "GET",
+                headers: {
+                    "x-rapidapi-key": atob(this.key),
+                    "x-rapidapi-host":
+                        "systran-systran-platform-for-language-processing-v1.p.rapidapi.com",
+                },
+            });
+            result = response.json;
         } catch (error) {
-            return Promise.reject(error);
+            throw toError(error);
         }
 
-        const words = (await result.json()) as POSResponse;
+        const words = toPOSResponse(result);
         let match = words.partsOfSpeech?.find(
             (pos) => pos.start === leftContext.length
         );
@@ -114,7 +115,7 @@ export class SystranPOSProvider implements PartOfSpeechProvider {
             if (posStr.startsWith("adv")) return PartOfSpeech.Adverb;
         }
 
-        return null;
+        throw new Error("Could not determine part of speech");
     }
 
     constructRequest(input: string, lang: string): string {
@@ -123,4 +124,31 @@ export class SystranPOSProvider implements PartOfSpeechProvider {
             `?input=${encodeURIComponent(input)}&lang=${this.mapLanguage(lang)}`
         );
     }
+}
+
+function toPOSResponse(value: unknown): POSResponse {
+    if (!isRecord(value) || !Array.isArray(value.partsOfSpeech)) {
+        return { partsOfSpeech: [] };
+    }
+
+    return {
+        partsOfSpeech: value.partsOfSpeech.flatMap((entry) => {
+            if (
+                !isRecord(entry)
+                || typeof entry.start !== "number"
+                || typeof entry.end !== "number"
+                || typeof entry.text !== "string"
+                || typeof entry.pos !== "string"
+            ) {
+                return [];
+            }
+
+            return [{
+                start: entry.start,
+                end: entry.end,
+                text: entry.text,
+                pos: entry.pos,
+            }];
+        }),
+    };
 }

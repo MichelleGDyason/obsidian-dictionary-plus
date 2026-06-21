@@ -26,7 +26,7 @@ export default class DefinitionProviderChooser extends FuzzySuggestModal<string>
                 void this.chooseItem(onlyAvailableProvider);
             }
         }
-        super.onOpen();
+        void super.onOpen();
     }
 
     getItems(): string[] {

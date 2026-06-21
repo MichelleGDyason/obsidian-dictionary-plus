@@ -25,7 +25,7 @@ export default class SynonymProviderChooser extends FuzzySuggestModal<string>{
                 void this.chooseItem(onlyAvailableProvider);
             }
         }
-        super.onOpen();
+        void super.onOpen();
     }
 
     getItems(): string[] {

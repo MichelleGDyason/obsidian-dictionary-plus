@@ -16,9 +16,14 @@ import { OpenThesaurusSynonymAPI as OpenThesaurusSynonymProvider } from "src/int
 // import { SynonymoSynonymAPI as SynonymoSynonymProvider } from "src/integrations/synonymoAPI";
 import { AltervistaSynonymProvider } from "src/integrations/altervistaAPI";
 import type DictionaryPlugin from "src/main";
-import { GoogleScraperDefinitionProvider, GoogleScraperSynonymProvider } from 'src/integrations/googleScraperAPI';
 import { JishoDefinitionProvider } from "src/integrations/jishoAPI";
 import { normalizeLookupTerm } from "./selection";
+import { toError } from "./safeTypes";
+
+interface DefinitionLookupResult {
+    content: DictionaryWord;
+    api: DefinitionProvider | null;
+}
 
 /*
 HOW TO ADD A NEW API:
@@ -38,7 +43,6 @@ export default class APIManager {
     definitionProvider: DefinitionProvider[] = [
         new FreeDictionaryDefinitionProvider(),
         new OfflineDictionary(this),
-        new GoogleScraperDefinitionProvider(),
         new JishoDefinitionProvider(),
     ];
     // Adds new API's to the Synonym Providers
@@ -47,7 +51,6 @@ export default class APIManager {
         new OpenThesaurusSynonymProvider(),
         // new SynonymoSynonymProvider(), see #44
         new AltervistaSynonymProvider(),
-        new GoogleScraperSynonymProvider(),
     ];
     // Adds new API's to the Part Of Speech Providers
     partOfSpeechProvider: PartOfSpeechProvider[] = [
@@ -65,16 +68,18 @@ export default class APIManager {
      * @returns The API Response of the chosen API as Promise<DictionaryWord>
      */
     public async requestDefinitions(query: string): Promise<DictionaryWord> {
+        query = normalizeLookupTerm(query) ?? query.trim();
+        if (!query) {
+            throw new Error("Select the word you want defined.");
+        }
+
         //Get the currently enabled API
         const api = this.getDefinitionAPI();
         const { cache, settings } = this.plugin;
         if (!api) {
-            const previousDefinition = await this.findPreviousDefinition(query);
-            if (previousDefinition) {
-                await this.plugin.localDictionary.recordLookup(previousDefinition);
-                return previousDefinition;
-            }
-            throw new Error(`No definition provider is available for ${settings.defaultLanguage}`);
+            const result = await this.requestDefinitionsWithFallback(null, query);
+            await this.plugin.localDictionary.recordLookup(result.content);
+            return result.content;
         }
 
         if (settings.useCaching && !api.name.toLowerCase().includes("offline")) {
@@ -86,32 +91,54 @@ export default class APIManager {
             } else {
                 //If it doesnt exist request a new Definition
                 const awaitedResult = await this.requestDefinitionsWithFallback(api, query);
-                if (awaitedResult) {
-                    cache.cachedDefinitions.push({ content: awaitedResult, api: api.name, lang: settings.defaultLanguage });
+                if (awaitedResult.api) {
+                    cache.cachedDefinitions.push({ content: awaitedResult.content, api: awaitedResult.api.name, lang: settings.defaultLanguage });
                     await this.plugin.saveCache();
-                    await this.plugin.localDictionary.recordLookup(awaitedResult);
+                    await this.plugin.localDictionary.recordLookup(awaitedResult.content);
                 }
 
-                return awaitedResult;
+                return awaitedResult.content;
             }
         } else {
             const result = await this.requestDefinitionsWithFallback(api, query);
-            await this.plugin.localDictionary.recordLookup(result);
-            return result;
+            await this.plugin.localDictionary.recordLookup(result.content);
+            return result.content;
         }
     }
 
-    private async requestDefinitionsWithFallback(api: DefinitionProvider, query: string): Promise<DictionaryWord> {
-        try {
-            return await api.requestDefinitions(query, this.plugin.settings.defaultLanguage);
-        } catch (error) {
-            const previousDefinition = await this.findPreviousDefinition(query);
-            if (previousDefinition) {
-                return previousDefinition;
+    private async requestDefinitionsWithFallback(
+        preferredApi: DefinitionProvider | null,
+        query: string
+    ): Promise<DefinitionLookupResult> {
+        const errors: string[] = [];
+        for (const api of this.getDefinitionFallbackOrder(preferredApi)) {
+            try {
+                return {
+                    content: await api.requestDefinitions(query, this.plugin.settings.defaultLanguage),
+                    api,
+                };
+            } catch (error) {
+                errors.push(`${api.name}: ${toError(error).message}`);
             }
-
-            throw error;
         }
+
+        const previousDefinition = await this.findPreviousDefinition(query);
+        if (previousDefinition) {
+            return { content: previousDefinition, api: null };
+        }
+
+        throw new Error(`No dictionary provider could define "${query}". ${errors.join("; ")}`);
+    }
+
+    private getDefinitionFallbackOrder(preferredApi: DefinitionProvider | null): DefinitionProvider[] {
+        const lang = this.plugin.settings.defaultLanguage;
+        const supportedProviders = this.definitionProvider.filter((api) => api.supportedLanguages.includes(lang));
+        if (!preferredApi) return supportedProviders;
+
+        return [
+            preferredApi,
+            ...supportedProviders.filter((api) => api.name !== preferredApi.name),
+        ];
     }
 
     private async findPreviousDefinition(query: string): Promise<DictionaryWord | null> {
@@ -212,21 +239,21 @@ export default class APIManager {
     /**
      * @returns Returns the currently selected Definition API
      */
-    private getDefinitionAPI(): DefinitionProvider {
+    private getDefinitionAPI(): DefinitionProvider | null {
         const lang = this.plugin.settings.defaultLanguage;
         return this.definitionProvider.find(
             (api) => api.name == this.plugin.settings.apiSettings[lang].definitionApiName
-        );
+        ) ?? null;
     }
 
     /**
      * @returns Returns the currently selected Synonym API
      */
-    private getSynonymAPI(): SynonymProvider {
+    private getSynonymAPI(): SynonymProvider | null {
         const lang = this.plugin.settings.defaultLanguage;
         return this.synonymProvider.find(
             (api) => api.name == this.plugin.settings.apiSettings[lang].synonymApiName
-        );
+        ) ?? this.synonymProvider.find((api) => api.supportedLanguages.includes(lang)) ?? null;
     }
 
     /**

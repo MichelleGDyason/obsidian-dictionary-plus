@@ -76,8 +76,12 @@ export default class SettingsTab extends PluginSettingTab {
                         list[api.name] = api.name;
                     }
                 }
+                const currentDefinitionProvider = plugin.settings.apiSettings[plugin.settings.defaultLanguage].definitionApiName;
+                const selectedDefinitionProvider = currentDefinitionProvider && list[currentDefinitionProvider]
+                    ? currentDefinitionProvider
+                    : Object.keys(list)[0];
                 dropdown.addOptions(list)
-                    .setValue(plugin.settings.apiSettings[plugin.settings.defaultLanguage].definitionApiName ?? Object.keys(list)[0])
+                    .setValue(selectedDefinitionProvider)
                     .onChange(async (value) => {
                         plugin.settings.apiSettings[plugin.settings.defaultLanguage].definitionApiName = value;
                         await this.save();
@@ -93,8 +97,12 @@ export default class SettingsTab extends PluginSettingTab {
                         list[api.name] = api.name;
                     }
                 }
+                const currentSynonymProvider = plugin.settings.apiSettings[plugin.settings.defaultLanguage].synonymApiName;
+                const selectedSynonymProvider = currentSynonymProvider && list[currentSynonymProvider]
+                    ? currentSynonymProvider
+                    : Object.keys(list)[0];
                 dropdown.addOptions(list)
-                    .setValue(plugin.settings.apiSettings[plugin.settings.defaultLanguage].synonymApiName ?? Object.keys(list)[0])
+                    .setValue(selectedSynonymProvider)
                     .onChange(async (value) => {
                         plugin.settings.apiSettings[plugin.settings.defaultLanguage].synonymApiName = value;
                         await this.save();
